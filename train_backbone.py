@@ -194,8 +194,8 @@ def resume_training(checkpoint_dir, model):
     return start_epoch
 
 def enable_gpu_usage(model):
-    if torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model, device_ids = range(torch.cuda.device_count()))  
+    #if torch.cuda.device_count() > 1:
+    #    model = torch.nn.DataParallel(model, device_ids = range(torch.cuda.device_count()))  
     model.cuda()
     return model
 
