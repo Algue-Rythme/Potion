@@ -178,7 +178,7 @@ class WideResNet(nn.Module):
                   
         
 def wrn28_10(num_classes=200, loss_type='dist'):
-    model = WideResNet(depth=28, widen_factor=2, num_classes=num_classes,
+    model = WideResNet(depth=28, widen_factor=10, num_classes=num_classes,
                        loss_type=loss_type, per_img_std=False, strides=[1, 2, 2])
     return model
 
