@@ -125,7 +125,7 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
         if use_gpu:
             torch.cuda.empty_cache()
         
-        progress = tqdm.tqdm(total=len(base_loader), leave=True, desc='training')
+        progress = tqdm.tqdm(total=len(base_loader), leave=True, ascii=True)
         for batch_idx, (inputs, targets) in enumerate(base_loader):
 
             optimizer.zero_grad()
