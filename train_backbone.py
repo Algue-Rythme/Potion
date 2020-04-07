@@ -45,7 +45,7 @@ def get_rotations_triplet(inputs, targets, split_ratio=None):
     return rotated_inputs, rotated_targets, angles_indexes
 
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
-        return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
+    return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
 def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
     criterion = nn.CrossEntropyLoss()
@@ -77,7 +77,7 @@ def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
                 rotate_correct += (rotate_predicted==angles_indexes).sum().item()
         
         print("Epoch {0} : Accuracy {1}".format(epoch, (float(correct)*100)/total), end='')
-        if rotate_classifier is not None:
+        if rotate_classifier is None:
             print('') # new line
         else:
             print(" : Rotate Accuracy {2}".format(float(rotate_correct)*100)/total)
@@ -193,7 +193,7 @@ def resume_training(checkpoint_dir, model):
 
 def enable_gpu_usage(model):
     if torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model, device_ids = range(torch.cuda.device_count()))  
+        model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))  
     model.cuda()
     return model
 
