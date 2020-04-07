@@ -83,11 +83,11 @@ def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
             if batch_idx >= num_batchs_max:
                 break
 
-        print("Epoch {0} : Accuracy {1}".format(epoch, (float(correct)*100)/total), end='')
+        print("Epoch {0} : Accuracy {1}".format(epoch, float(correct)*100/total), end='')
         if rotate_classifier is None:
             print('') # new line
         else:
-            print(" : Rotate Accuracy {0}".format(float(rotate_correct)*100)/total)
+            print(" : Rotate Accuracy {0}".format(float(rotate_correct)*100/total))
     torch.cuda.empty_cache()  # ?
 
 
