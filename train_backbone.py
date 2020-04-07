@@ -53,10 +53,12 @@ def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
     if rotate_classifier is not None:
         rotate_classifier.eval()
         rotate_correct = 0
+    num_batchs_max = 100
+    progress = tqdm.tqdm(total=num_batchs_max, leave=True, ascii=True)
     with torch.no_grad():
         test_loss = 0
         correct, total = 0, 0
-        for _, (inputs, targets) in enumerate(base_loader_test):
+        for batch_idx, (inputs, targets) in enumerate(base_loader_test):
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
 
@@ -77,11 +79,15 @@ def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
                 rotate_predicted = torch.argmax(rotate_logits, 1)
                 rotate_correct += (rotate_predicted==angles_indexes).sum().item()
 
+            progress.update()
+            if batch_idx >= num_batchs_max:
+                break
+
         print("Epoch {0} : Accuracy {1}".format(epoch, (float(correct)*100)/total), end='')
         if rotate_classifier is None:
             print('') # new line
         else:
-            print(" : Rotate Accuracy {2}".format(float(rotate_correct)*100)/total)
+            print(" : Rotate Accuracy {0}".format(float(rotate_correct)*100)/total)
     torch.cuda.empty_cache()  # ?
 
 
@@ -122,12 +128,12 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
 
         if use_gpu:
             torch.cuda.empty_cache()
-        
+
         progress = tqdm.tqdm(total=len(base_loader), leave=True, ascii=True)
         for _, (inputs, targets) in enumerate(base_loader):
 
             optimizer.zero_grad()
-            
+
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
 
@@ -144,7 +150,7 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
                 correct += (lam * predictions.eq(target_a).cpu().sum().float()
                             + (1 - lam) * predictions.eq(target_b).cpu().sum().float())
 
-            rotations_split_ratio = 0.25 if fine_tuning else 1.  # less rotations with fine tuning
+            rotations_split_ratio = 0.25 # if fine_tuning else 1.  # less rotations with fine tuning
             triplet = get_rotations_triplet(inputs, targets, split_ratio=rotations_split_ratio)
             inputs, targets, angles_indexes = triplet
 
