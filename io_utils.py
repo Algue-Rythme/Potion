@@ -22,7 +22,7 @@ def parse_args(script):
         #for meta-learning methods, each epoch contains 100 episodes. The default epoch number is dataset dependent.
         parser.add_argument('--resume'      , action='store_true', help='continue from previous trained model with largest epoch')
         parser.add_argument('--lr'          , default=0.001, type=int, help='learning rate') 
-        parser.add_argument('--batch_size' , default=5, type=int, help='batch size ')
+        parser.add_argument('--batch_size' , default=16, type=int, help='batch size ')
         parser.add_argument('--test_batch_size' , default=2, type=int, help='batch size ')
         parser.add_argument('--alpha'       , default=2.0, type=int, help='for S2M2 training ')
     elif script == 'test':

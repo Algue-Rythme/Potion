@@ -51,14 +51,15 @@ def get_rotations_triplet(inputs, targets, split_ratio=None):
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
         return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
-def evaluate(base_loader_test, model, rotate_classifier=None):
+def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
+    criterion = nn.CrossEntropyLoss()
     model.eval()
     if rotate_classifier is not None:
         rotate_classifier.eval()
     with torch.no_grad():
         test_loss = 0
         correct, total = 0, 0
-        for batch_idx, (inputs, targets) in enumerate(base_loader_test):
+        for _, (inputs, targets) in enumerate(base_loader_test):
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
             
@@ -126,7 +127,7 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
             torch.cuda.empty_cache()
         
         progress = tqdm.tqdm(total=len(base_loader), leave=True, ascii=True)
-        for batch_idx, (inputs, targets) in enumerate(base_loader):
+        for _, (inputs, targets) in enumerate(base_loader):
 
             optimizer.zero_grad()
             
@@ -177,9 +178,9 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
             torch.save({'epoch':epoch, 'state':model.state_dict() }, outfile)
 
         if fine_tuning:
-            evaluate(base_loader_val, model, rotate_classifier=None)  # do not check rotations anymore
+            evaluate(base_loader_val, epoch, model, rotate_classifier=None)  # do not check rotations anymore
         else:
-            evaluate(base_loader_val, model, rotate_classifier=rotate_classifier)
+            evaluate(base_loader_val, epoch, model, rotate_classifier=rotate_classifier)
        
     return model 
 
