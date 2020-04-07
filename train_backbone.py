@@ -52,13 +52,14 @@ def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
     model.eval()
     if rotate_classifier is not None:
         rotate_classifier.eval()
+        rotate_correct = 0
     with torch.no_grad():
         test_loss = 0
         correct, total = 0, 0
         for _, (inputs, targets) in enumerate(base_loader_test):
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
-            
+
             if rotate_classifier is not None:
                 triplet = get_rotations_triplet(inputs, targets, split_ratio=None)
                 inputs, targets, angles_indexes = triplet
@@ -75,7 +76,7 @@ def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
                 rotate_logits = rotate_classifier(out_latent)
                 rotate_predicted = torch.argmax(rotate_logits, 1)
                 rotate_correct += (rotate_predicted==angles_indexes).sum().item()
-        
+
         print("Epoch {0} : Accuracy {1}".format(epoch, (float(correct)*100)/total), end='')
         if rotate_classifier is None:
             print('') # new line
@@ -97,8 +98,8 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
     cross_entropy = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
 
-    # model.final_feat_dim == 640
-    rotate_classifier = nn.Sequential(nn.Linear(640, 4))
+    final_feat_dim = 640  # model.final_feat_dim
+    rotate_classifier = nn.Sequential(nn.Linear(final_feat_dim, 4))
     if use_gpu:
         rotate_classifier.cuda()
 
@@ -160,7 +161,7 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
                 correct += predictions.eq(targets).cpu().sum().float()
                 total += targets.size(0)
                 classifier_losses.append(classifier_loss.item())
-            
+
             loss.backward()  # Rotation loss + Cosine Loss
             optimizer.step()
 
@@ -177,8 +178,8 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
             evaluate(base_loader_val, epoch, model, rotate_classifier=None)  # do not check rotations anymore
         else:
             evaluate(base_loader_val, epoch, model, rotate_classifier=rotate_classifier)
-       
-    return model 
+
+    return model
 
 
 def resume_training(checkpoint_dir, model):
