@@ -1,13 +1,9 @@
-import argparse
 import collections
-import csv
 import os
 from os import path
 
 import numpy as np
 import torch
-from torch.autograd import Variable
-import torch.backends.cudnn as cudnn
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
@@ -216,14 +212,14 @@ if __name__ == '__main__':
 
     base_file = data_dir[params.dataset] + 'base.json'
     val_file = data_dir[params.dataset] + 'val.json'
-    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s' %(save_dir, params.dataset, params.model, params.method)
+    params.checkpoint_dir = '%s/checkpoints/%s/%s_%s/%s' %(save_dir, params.dataset, params.model, params.method, params.run_name)
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch
 
     base_datamgr = SimpleDataManager(image_size, batch_size=params.batch_size)
-    base_loader = base_datamgr.get_data_loader(base_file, aug=params.train_aug, num_workers=16)
+    base_loader = base_datamgr.get_data_loader(base_file, aug=params.train_aug, num_workers=16, lazy_load=args.lazy_load)
     base_datamgr_val = SimpleDataManager(image_size, batch_size=params.test_batch_size)
-    base_loader_val = base_datamgr_val.get_data_loader(val_file, aug=False, num_workers=16)
+    base_loader_val = base_datamgr_val.get_data_loader(val_file, aug=False, num_workers=16, lazy_load=args.lazy_load)
 
     if params.model == 'WideResNet28_10':
         model = wrn28_10(num_classes=params.num_classes)

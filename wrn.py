@@ -1,17 +1,14 @@
 # This code is modified from https://github.com/nupurkmr9/S2M2_fewshot
 # S2M2_fewshot is itself derived from https://github.com/wyharveychen/CloserLookFewShot
 # but lacks proper references to it, including the license
+import sys
+import os
+import math
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 import torch.nn.functional as F
-from torch.autograd import Variable
-
-import sys, os
 import numpy as np
 import random
-
-import math
 from torch.nn.utils.weight_norm import WeightNorm
 
 
@@ -21,7 +18,7 @@ class distLinear(nn.Module):
         self.L = nn.Linear(indim, outdim, bias=False)
         self.class_wise_learnable_norm = True # If False, then it is Cosine Classifier, else it is Linear+Crossentropy
         if self.class_wise_learnable_norm:
-            pass#WeightNorm.apply(self.L, 'weight', dim=0) # split the weight update component to direction and norm      
+            WeightNorm.apply(self.L, 'weight', dim=0) # split the weight update component to direction and norm      
         if outdim <= 200:
             self.scale_factor = 2; # a fixed scale factor to scale the output of cos value into a reasonably large input for softmax
         else:
