@@ -217,9 +217,9 @@ if __name__ == '__main__':
     stop_epoch = params.stop_epoch
 
     base_datamgr = SimpleDataManager(image_size, batch_size=params.batch_size)
-    base_loader = base_datamgr.get_data_loader(base_file, aug=params.train_aug, num_workers=16, lazy_load=args.lazy_load)
+    base_loader = base_datamgr.get_data_loader(base_file, aug=params.train_aug, num_workers=16, lazy_load=params.lazy_load)
     base_datamgr_val = SimpleDataManager(image_size, batch_size=params.test_batch_size)
-    base_loader_val = base_datamgr_val.get_data_loader(val_file, aug=False, num_workers=16, lazy_load=args.lazy_load)
+    base_loader_val = base_datamgr_val.get_data_loader(val_file, aug=False, num_workers=16, lazy_load=params.lazy_load)
 
     if params.model == 'WideResNet28_10':
         model = wrn28_10(num_classes=params.num_classes)
