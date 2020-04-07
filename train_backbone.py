@@ -1,40 +1,38 @@
 import collections
 import os
-from os import path
+import random
 
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
-import torchvision.transforms as transforms
-import torchvision.datasets as datasets
 import tqdm
 
-from datamgr import SimpleDataManager, SetDataManager
+from datamgr import SimpleDataManager
 from wrn import wrn28_10
-from io_utils import parse_args, get_resume_file, get_assigned_file
+from io_utils import parse_args, get_resume_file
 
 
 use_gpu = torch.cuda.is_available()
 
 
-def get_rotations_triplet(inputs, targets, split_ratio=None):
+def get_rotations_triplet(inputs, targets, split=True):
     batch_size = inputs.size(0)
     rotated_inputs = []
     rotated_targets = []
     angles_indexes = []
-    indices = np.arange(batch_size)
-    if split_ratio is not None:
-        np.random.shuffle(indices)
-        split_size = int(batch_size * split_ratio)
-        indices = indices[:split_size]
-    for j in indices:
+    if split:
+        indices = [[random.randrange(4)] for _ in range(batch_size)]
+    else:
+        indices = [list(range(4)) for _ in range(batch_size)]
+    for j in range(batch_size):
         x90 = inputs[j].transpose(2,1).flip(1)
         x180 = x90.transpose(2,1).flip(1)
         x270 =  x180.transpose(2,1).flip(1)
-        rotated_inputs += [inputs[j], x90, x180, x270]
-        rotated_targets += [targets[j] for _ in range(4)]
-        angles_indexes += list(range(4))
+        rotations = [inputs[j], x90, x180, x270]
+        rotations = [rotations[i] for i in indices[j]]
+        rotated_inputs += rotations
+        rotated_targets += [targets[j] for _ in range(len(rotations))]
+        angles_indexes += indices[j]
     rotated_inputs = torch.stack(rotated_inputs)
     rotated_targets = torch.stack(rotated_targets)
     angles_indexes = torch.LongTensor(angles_indexes)
@@ -63,7 +61,7 @@ def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
                 inputs, targets = inputs.cuda(), targets.cuda()
 
             if rotate_classifier is not None:
-                triplet = get_rotations_triplet(inputs, targets, split_ratio=None)
+                triplet = get_rotations_triplet(inputs, targets, split=True)
                 inputs, targets, angles_indexes = triplet
 
             out_latent, outputs = model.forward(inputs)
@@ -150,8 +148,7 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
                 correct += (lam * predictions.eq(target_a).cpu().sum().float()
                             + (1 - lam) * predictions.eq(target_b).cpu().sum().float())
 
-            rotations_split_ratio = 0.25 # if fine_tuning else 1.  # less rotations with fine tuning
-            triplet = get_rotations_triplet(inputs, targets, split_ratio=rotations_split_ratio)
+            triplet = get_rotations_triplet(inputs, targets, split=True)
             inputs, targets, angles_indexes = triplet
 
             latent_space, outputs = model(inputs)
