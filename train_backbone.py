@@ -73,21 +73,21 @@ def evaluate(base_loader_val, model, rotate_classifier=None):
             classifier_loss = criterion(outputs, targets)  # supervised loss (softmax, cosine... )
             classifier_losses.append(classifier_loss.item())
             classifier_acc = update_acc(classifier_acc, outputs, targets)
-            desc = metric_desc('ce', classifier_losses, *classifier_acc)
+            desc = metric_desc('ce', classifier_losses, classifier_acc)
 
             if rotate_classifier is not None:
                 rotate_logits = rotate_classifier(out_latent)
                 rotation_loss = cross_entropy(rotate_logits, angles_indexes)
                 rotation_losses.append(rotation_loss.item())
                 rotations_acc = update_acc(rotations_acc, rotate_logits, angles_indexes)
-                desc += metric_desc('rot', rotation_losses, *rotations_acc)
+                desc += metric_desc('rot', rotation_losses, rotations_acc)
 
             progress.set_description(desc=desc)
             progress.update()
         progress.close()
     torch.cuda.empty_cache()  # ?
 
-def metric_desc(name, losses, correct_total=None, total=None):
+def metric_desc(name, losses, correct_total=None):
     avg_loss = np.mean(losses)
     desc = ' '+name+('_loss=%.3f'%avg_loss)
     if correct_total is not None:
