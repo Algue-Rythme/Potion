@@ -118,6 +118,7 @@ def train_epoch(model, rotate_classifier, base_loader, optimizer, fine_tuning):
 
     progress = tqdm.tqdm(total=len(base_loader), leave=True, ascii=True)
     for _, (inputs, targets) in enumerate(base_loader):
+        desc = ''
 
         optimizer.zero_grad()
 
