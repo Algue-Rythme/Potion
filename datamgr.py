@@ -1,16 +1,18 @@
+from abc import abstractmethod
 import torch
-from PIL import Image
-import numpy as np
 import torchvision.transforms as transforms
 import additional_transforms as add_transforms
 from dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
-from abc import abstractmethod
 
 
 class TransformLoader:
     def __init__(self, image_size, 
-                 normalize_param    = dict(mean=[0.485, 0.456, 0.406] , std=[0.229, 0.224, 0.225]),
-                 jitter_param       = dict(Brightness=0.4, Contrast=0.4, Color=0.4)):
+                 normalize_param = None,
+                 jitter_param = None):
+        if normalize_param is None:
+            normalize_param = dict(mean=[0.485, 0.456, 0.406] , std=[0.229, 0.224, 0.225])
+        if jitter_param is None:
+            jitter_param = dict(Brightness=0.4, Contrast=0.4, Color=0.4)
         self.image_size = image_size
         self.normalize_param = normalize_param
         self.jitter_param = jitter_param

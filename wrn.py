@@ -162,7 +162,7 @@ class WideResNet(nn.Module):
         for depth, block in enumerate(self.blocks):
             out = block(out)  # block of ResNet
             if depth+1 == layer_mix:  # time to mixup, boys
-                out, target_a, target_b, lam = mixup_data(out, target, lam=lam)
+                out, target_a, target_b, lam = mixup_data(out, mixup.target, lam=lam)
         out = self.relu(self.bn1(out))
         out = F.avg_pool2d(out, out.size()[2:])
         out_latent = out.view(out.size(0), -1)
@@ -170,12 +170,10 @@ class WideResNet(nn.Module):
 
         if mixup is not None:
             return out_latent, output, target_a , target_b
-        else:
-            return out_latent, output
-                  
-        
+        return out_latent, output
+
+
 def wrn28_10(num_classes=200, loss_type='dist'):
     model = WideResNet(depth=28, widen_factor=10, num_classes=num_classes,
                        loss_type=loss_type, per_img_std=False, strides=[1, 2, 2])
     return model
-

@@ -15,14 +15,16 @@ from io_utils import parse_args, get_resume_file
 use_gpu = torch.cuda.is_available()
 
 
-def get_rotations_triplet(inputs, targets, split=True):
+def get_rotations_triplet(inputs, targets, rotation_type=None):
     batch_size = inputs.size(0)
+    if rotation_type is None:
+        return inputs, targets, torch.LongTensor([0]*batch_size)
     rotated_inputs = []
     rotated_targets = []
     angles_indexes = []
-    if split:
+    if rotation_type == 'some':
         indices = [[random.randrange(4)] for _ in range(batch_size)]
-    else:
+    elif rotation_type == 'all':
         indices = [list(range(4)) for _ in range(batch_size)]
     for j in range(batch_size):
         x90 = inputs[j].transpose(2,1).flip(1)
@@ -45,63 +47,123 @@ def get_rotations_triplet(inputs, targets, split=True):
 def mixup_criterion(criterion, pred, y_a, y_b, lam):
     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
 
-def evaluate(base_loader_test, epoch, model, rotate_classifier=None):
+def evaluate(base_loader_val, model, rotate_classifier=None):
+    cross_entropy = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
+
     model.eval()
+    classifier_losses = []
+    classifier_acc = 0, 0
     if rotate_classifier is not None:
         rotate_classifier.eval()
-        rotate_correct = 0
-    num_batchs_max = 100
-    progress = tqdm.tqdm(total=num_batchs_max, leave=True, ascii=True)
+        rotation_losses = []
+        rotations_acc = 0, 0
+
     with torch.no_grad():
-        test_loss = 0
-        correct, total = 0, 0
-        for batch_idx, (inputs, targets) in enumerate(base_loader_test):
+        progress = tqdm.tqdm(total=len(base_loader_val), leave=True, ascii=True)
+        for _, (inputs, targets) in enumerate(base_loader_val):
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
 
             if rotate_classifier is not None:
-                triplet = get_rotations_triplet(inputs, targets, split=True)
-                inputs, targets, angles_indexes = triplet
+                inputs, targets, angles_indexes = get_rotations_triplet(inputs, targets, rotation_type='some')
 
             out_latent, outputs = model.forward(inputs)
-            loss = criterion(outputs, targets)
 
-            test_loss += loss.data.item()
-            _, predicted = torch.max(outputs.data, 1)
-            total += targets.size(0)
-            correct += predicted.eq(targets.data).cpu().sum()
+            classifier_loss = criterion(outputs, targets)  # supervised loss (softmax, cosine... )
+            classifier_losses.append(classifier_loss.item())
+            classifier_acc = update_acc(classifier_acc, outputs, targets)
+            desc = metric_desc('ce', classifier_losses, classifier_acc)
 
             if rotate_classifier is not None:
                 rotate_logits = rotate_classifier(out_latent)
-                rotate_predicted = torch.argmax(rotate_logits, 1)
-                rotate_correct += (rotate_predicted==angles_indexes).sum().item()
+                rotation_loss = cross_entropy(rotate_logits, angles_indexes)
+                rotation_losses.append(rotation_loss.item())
+                rotations_acc = update_acc(rotations_acc, rotate_logits, angles_indexes)
+                desc += metric_desc('rot', rotation_losses)
 
+            progress.set_description(desc=desc)
             progress.update()
-            if batch_idx >= num_batchs_max:
-                break
-
-        print("Epoch {0} : Accuracy {1}".format(epoch, float(correct)*100/total), end='')
-        if rotate_classifier is None:
-            print('') # new line
-        else:
-            print(" : Rotate Accuracy {0}".format(float(rotate_correct)*100/total))
+        progress.close()
     torch.cuda.empty_cache()  # ?
-
 
 def update_batch_infos(progress, classifier_losses, rotate_losses, correct, total):
     avg_train_loss = np.mean(classifier_losses)
     avg_rot_loss = np.mean(rotate_losses)
     acc = 100.*correct/total
-    desc =  'Loss: %.3f | Acc: %.3f%% | RotLoss: %.3f '%(avg_train_loss, acc, avg_rot_loss)
+    desc =  'Loss: %.3f | Acc: %.3f%% | RotLoss: %.3f | RotAcc'%(avg_train_loss, acc, avg_rot_loss)
     progress.set_description(desc=desc)
     progress.update()
 
+def metric_desc(name, losses, correct_total=None, total=None):
+    avg_loss = np.mean(losses)
+    desc = ' '+name+('_loss=%.3f'%avg_loss)
+    if correct_total is not None:
+        correct, total = correct_total
+        acc = 100.*correct/total
+        desc += ' '+name+('_acc=%.3f%%'%acc)
+    return desc
 
-def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, params, fine_tuning):
+def update_acc(correct_total, outputs, targets):
+    _, predictions = torch.max(outputs, 1)
+    correct, total = correct_total
+    correct += predictions.eq(targets).cpu().sum().item()
+    total += targets.size(0)
+    return correct, total
+
+def train_epoch(model, rotate_classifier, base_loader, optimizer, fine_tuning):
     cross_entropy = nn.CrossEntropyLoss()
     criterion = nn.CrossEntropyLoss()
+    MixupTuple = collections.namedtuple('MixupParams', 'targets hidden input_space alpha lam')
 
+    model.train()
+    rotate_classifier.train()
+    classifier_losses, rotation_losses = [], []
+    classifier_acc = 0, 0
+
+    if use_gpu:
+        torch.cuda.empty_cache()
+
+    progress = tqdm.tqdm(total=len(base_loader), leave=True, ascii=True)
+    for _, (inputs, targets) in enumerate(base_loader):
+
+        optimizer.zero_grad()
+
+        if use_gpu:
+            inputs, targets = inputs.cuda(), targets.cuda()
+
+        if fine_tuning:
+            lam = np.random.beta(params.alpha, params.alpha)
+            mixup_params = MixupTuple(targets=targets, hidden=True, alpha=params.alpha, lam=lam)
+            _, outputs, target_a, target_b = model(inputs, mixup_params)
+            loss = mixup_criterion(criterion, outputs, target_a, target_b, lam)
+            classifier_losses.append(loss.item())
+            loss.backward()  # Mixup loss
+
+        inputs, targets, angles_indexes = get_rotations_triplet(inputs, targets, rotation_type='some')
+        latent_space, outputs = model(inputs)
+
+        classifier_loss = criterion(outputs, targets)  # supervised loss (softmax, cosine... )
+        classifier_losses.append(classifier_loss.item())
+        classifier_acc = update_acc(classifier_acc, outputs, targets)
+        desc += metric_desc('ce', classifier_losses, classifier_acc)
+
+        rotate_outputs = rotate_classifier(latent_space)
+        rotation_loss = cross_entropy(rotate_outputs, angles_indexes)
+        rotation_losses.append(rotation_loss.item())
+        desc += metric_desc('rot', rotation_losses)
+
+        loss = rotation_loss + classifier_loss
+        loss.backward()
+        optimizer.step()
+
+        progress.set_description(desc=desc)
+        progress.update()
+
+    progress.close()
+
+
+def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, params, fine_tuning):
     final_feat_dim = 640  # model.final_feat_dim
     rotate_classifier = nn.Sequential(nn.Linear(final_feat_dim, 4))
     if use_gpu:
@@ -110,65 +172,14 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
     optimizer = torch.optim.Adam([
                 {'params': model.parameters()},
                 {'params': rotate_classifier.parameters()}
-            ])
+                ])
 
     print("stop_epoch", start_epoch, stop_epoch)
-
-    MixupTuple = collections.namedtuple('MixupParams', 'targets hidden input_space alpha lam')
 
     for epoch in range(start_epoch, stop_epoch):
         print('\nEpoch: %d' % epoch)
 
-        model.train()
-        rotate_classifier.train()
-        classifier_losses, rotation_losses = [], []
-        correct, total = 0, 0
-
-        if use_gpu:
-            torch.cuda.empty_cache()
-
-        progress = tqdm.tqdm(total=len(base_loader), leave=True, ascii=True)
-        for _, (inputs, targets) in enumerate(base_loader):
-
-            optimizer.zero_grad()
-
-            if use_gpu:
-                inputs, targets = inputs.cuda(), targets.cuda()
-
-            if fine_tuning:
-                lam = np.random.beta(params.alpha, params.alpha)
-                mixup_params = MixupTuple(targets=targets, hidden=True, alpha=params.alpha, lam=lam)
-                _, outputs, target_a, target_b = model(inputs, mixup_params)
-                loss = mixup_criterion(criterion, outputs, target_a, target_b, lam)
-                classifier_losses.append(loss.item())
-                loss.backward()  # Mixup loss
-
-                _, predictions = torch.max(outputs, 1)
-                total += targets.size(0)
-                correct += (lam * predictions.eq(target_a).cpu().sum().float()
-                            + (1 - lam) * predictions.eq(target_b).cpu().sum().float())
-
-            triplet = get_rotations_triplet(inputs, targets, split=True)
-            inputs, targets, angles_indexes = triplet
-
-            latent_space, outputs = model(inputs)
-            rotate_outputs = rotate_classifier(latent_space)
-
-            rotation_loss = cross_entropy(rotate_outputs, angles_indexes)
-            classifier_loss = criterion(outputs, targets)  # supervised loss (softmax, cosine... )
-            loss = rotation_loss + classifier_loss
-
-            rotation_losses.append(rotation_loss.item())
-            if not fine_tuning:
-                _, predictions = torch.max(outputs, 1)
-                correct += predictions.eq(targets).cpu().sum().float()
-                total += targets.size(0)
-                classifier_losses.append(classifier_loss.item())
-
-            loss.backward()  # Rotation loss + Cosine Loss
-            optimizer.step()
-
-            update_batch_infos(progress, classifier_losses, rotation_losses, correct, total)
+        train_epoch(model, rotate_classifier, base_loader, optimizer, fine_tuning)
 
         if not os.path.isdir(params.checkpoint_dir):
             os.makedirs(params.checkpoint_dir)
@@ -178,20 +189,19 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
             torch.save({'epoch':epoch, 'state':model.state_dict() }, outfile)
 
         if fine_tuning:
-            evaluate(base_loader_val, epoch, model, rotate_classifier=None)  # do not check rotations anymore
+            evaluate(base_loader_val, model, rotate_classifier=None)  # do not check rotations anymore
         else:
-            evaluate(base_loader_val, epoch, model, rotate_classifier=rotate_classifier)
+            evaluate(base_loader_val, model, rotate_classifier=rotate_classifier)
 
     return model
 
-
 def resume_training(checkpoint_dir, model):
-    resume_file = get_resume_file(params.checkpoint_dir )        
+    resume_file = get_resume_file(checkpoint_dir)        
     print("resume_file", resume_file)
     tmp = torch.load(resume_file)
     start_epoch = tmp['epoch']+1
     print("restored epoch is" , tmp['epoch'])
-    state = tmp['state']                 
+    state = tmp['state']
     model.load_state_dict(state)
     return start_epoch
 
@@ -200,7 +210,6 @@ def enable_gpu_usage(model):
         model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))  
     model.cuda()
     return model
-
 
 if __name__ == '__main__':
     params = parse_args('train')
@@ -238,7 +247,7 @@ if __name__ == '__main__':
     elif params.method =='S2M2_R':
         resume_rotate_file_dir = params.checkpoint_dir.replace("S2M2_R","rotation")
         start_epoch = resume_training(resume_rotate_file_dir, model)
-    
+
     if params.method =='S2M2_R':
         model = train_s2m2(base_loader, base_loader_val, model, start_epoch, start_epoch+stop_epoch, params, fine_tuning=True)
     elif params.method =='rotation':
