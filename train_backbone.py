@@ -217,7 +217,7 @@ if __name__ == '__main__':
     data_dir['miniImagenet']    = './filelists/miniImagenet/'
 
     base_file = data_dir[params.dataset] + 'base.json'
-    val_file = data_dir[params.dataset] + 'val.json'
+    val_file = data_dir[params.dataset] + 'base.json'  # Same classes, same examples...
     params.checkpoint_dir = '%s/checkpoints/%s/%s_%s/%s' %(save_dir, params.dataset, params.model, params.method, params.run_name)
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch

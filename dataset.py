@@ -95,7 +95,7 @@ class SubDataset:
     def __len__(self):
         return len(self.sub_meta)
 
-class EpisodicBatchSampler(object):
+class EpisodicBatchSampler:
     def __init__(self, n_classes, n_way, n_episodes):
         self.n_classes = n_classes
         self.n_way = n_way

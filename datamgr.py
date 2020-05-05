@@ -6,7 +6,7 @@ from dataset import SimpleDataset, SetDataset, EpisodicBatchSampler
 
 
 class TransformLoader:
-    def __init__(self, image_size, 
+    def __init__(self, image_size,
                  normalize_param = None,
                  jitter_param = None):
         if normalize_param is None:
@@ -54,7 +54,7 @@ class SimpleDataManager(DataManager):
         self.batch_size = batch_size
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug, num_workers=8, lazy_load=False): #parameters that would change on train/val set
+    def get_data_loader(self, data_file, aug, num_workers=8, lazy_load=False):
         transform = self.trans_loader.get_composed_transform(aug)
         dataset = SimpleDataset(data_file, transform, lazy_load=lazy_load)
         data_loader_params = dict(batch_size=self.batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)       
@@ -62,7 +62,7 @@ class SimpleDataManager(DataManager):
         return data_loader
 
 class SetDataManager(DataManager):
-    def __init__(self, image_size, n_way, n_support, n_query, n_episode=100):        
+    def __init__(self, image_size, n_way, n_support, n_query, n_episode=100):
         super(SetDataManager, self).__init__()
         self.image_size = image_size
         self.n_way = n_way
@@ -70,10 +70,10 @@ class SetDataManager(DataManager):
         self.n_episode = n_episode
         self.trans_loader = TransformLoader(image_size)
 
-    def get_data_loader(self, data_file, aug, num_workers=12, lazy_load=False): #parameters that would change on train/val set
+    def get_data_loader(self, data_file, aug, num_workers=12, lazy_load=False):
         transform = self.trans_loader.get_composed_transform(aug)
         dataset = SetDataset(data_file, self.batch_size, transform, lazy_load=lazy_load)
-        sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_episode)  
+        sampler = EpisodicBatchSampler(len(dataset), self.n_way, self.n_episode)
         data_loader_params = dict(batch_sampler=sampler, num_workers=num_workers, pin_memory=True)       
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
