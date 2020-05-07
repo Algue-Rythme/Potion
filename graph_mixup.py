@@ -24,6 +24,7 @@ def evaluate(base_loader_val, model, losses_bag):
         for _, (inputs, targets) in enumerate(base_loader_val):
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
+            inputs = torch.flatten(inputs, 0, 1)
             out_latent = model.forward(inputs)
             progress_desc = ' '.join([desc for _, _, desc in losses_bag.get_losses(out_latent, targets)])
             progress.set_description(desc=progress_desc)
@@ -40,11 +41,11 @@ def train_epoch(model, losses_bag, base_loader, optimizer):
 
     progress = tqdm.tqdm(total=len(base_loader), leave=True, ascii=True)
     for _, (inputs, targets) in enumerate(base_loader):
-        inputs = torch.flatten(inputs, 0, 1)
         progress_desc = ''
         optimizer.zero_grad()
         if use_gpu:
             inputs, targets = inputs.cuda(), targets.cuda()
+        inputs = torch.flatten(inputs, 0, 1)
         latent_space = model(inputs)
         for _, loss, desc in losses_bag.get_losses(latent_space, targets):
             progress_desc += desc
