@@ -1,3 +1,4 @@
+import collections
 import os
 import functools
 import json
@@ -26,25 +27,25 @@ def lazy_read_image(image_path):
 def read_image(image_path):
     return Image.open(image_path).convert('RGB')
 
-
 class SimpleDataset:
-    def __init__(self, data_file, transform, target_transform=identity, lazy_load=False):
+    def __init__(self, data_file, transform, indexes=None, target_transform=identity, lazy_load=False):
         with open(data_file, 'r') as f:
             self.meta = json.load(f)
         self.transform = transform
         self.target_transform = target_transform
         self.image_reader = lazy_read_image if lazy_load else read_image
-
+        self.indexes = list(range(len(self.meta['image_names']))) if indexes is None else indexes
 
     def __getitem__(self, i):
-        image_path = os.path.join(self.meta['image_names'][i])
+        index = self.indexes[i]
+        image_path = os.path.join(self.meta['image_names'][index])
         img = self.image_reader(image_path)
         img = self.transform(img)
-        target = self.target_transform(self.meta['image_labels'][i])
+        target = self.target_transform(self.meta['image_labels'][index])
         return img, target
 
     def __len__(self):
-        return len(self.meta['image_names'])
+        return len(self.indexes)
 
 
 class SetDataset:
@@ -54,7 +55,7 @@ class SetDataset:
 
         self.cl_list = np.unique(self.meta['image_labels']).tolist()
 
-        self.sub_meta = {}
+        self.sub_meta = collections.defaultdict(list)
         for cl in self.cl_list:
             self.sub_meta[cl] = []
 
@@ -62,13 +63,13 @@ class SetDataset:
             self.sub_meta[y].append(x)
 
         self.sub_dataloader = []
-        sub_data_loader_params = dict(batch_size = batch_size,
-                                      shuffle = True,
-                                      num_workers = 0, #use main thread only or may receive multiple batches
-                                      pin_memory = False)
+        sub_data_loader_params = dict(batch_size=batch_size,
+                                      shuffle=True,
+                                      num_workers=0, #use main thread only or may receive multiple batches
+                                      pin_memory=False)
         for cl in self.cl_list:
             sub_dataset = SubDataset(self.sub_meta[cl], cl, transform=transform, lazy_load=lazy_load)
-            self.sub_dataloader.append( torch.utils.data.DataLoader(sub_dataset, **sub_data_loader_params) )
+            self.sub_dataloader.append(torch.utils.data.DataLoader(sub_dataset, **sub_data_loader_params))
 
     def __getitem__(self,i):
         return next(iter(self.sub_dataloader[i]))

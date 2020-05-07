@@ -206,6 +206,7 @@ def enable_gpu_usage(model):
 
 if __name__ == '__main__':
     params = parse_args('train')
+    random.seed(914637)
 
     image_size = 84
     # the weights are stored into ./weights folder
@@ -222,10 +223,9 @@ if __name__ == '__main__':
     start_epoch = params.start_epoch
     stop_epoch = params.stop_epoch
 
-    base_datamgr = SimpleDataManager(image_size, batch_size=params.batch_size)
-    base_loader = base_datamgr.get_data_loader(base_file, aug=params.train_aug, num_workers=16, lazy_load=params.lazy_load)
-    base_datamgr_val = SimpleDataManager(image_size, batch_size=params.test_batch_size)
-    base_loader_val = base_datamgr_val.get_data_loader(val_file, aug=False, num_workers=16, lazy_load=params.lazy_load)
+    base_datamgr = SimpleDataManager(base_file, image_size, split_ratio=5/6, lazy_load=params.lazy_load)
+    base_loader = base_datamgr.get_data_loader(mode='train', batch_size=params.batch_size, aug=params.train_aug, num_workers=12)
+    base_loader_val = base_datamgr.get_data_loader(mode='test', batch_size=params.test_batch_size, aug=False, num_workers=12)
 
     if params.model == 'WideResNet28_10':
         model = wrn28_10(num_classes=params.num_classes)

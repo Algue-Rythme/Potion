@@ -9,25 +9,23 @@ def parse_args(script):
     parser.add_argument('--dataset', default='miniImagenet', help='CUB/miniImagenet')
     parser.add_argument('--run_name', default='default', help='Name of the xp')
     parser.add_argument('--model', default='WideResNet28_10', help='model:  WideResNet28_10')
-    parser.add_argument('--method', default='S2M2_R', help='rotation/S2M2_R')
     parser.add_argument('--train_aug', action='store_true', help='perform data augmentation or not during training ')
     parser.add_argument('--lazy_load', action='store_true', help='Cache the images in RAM')
-    parser.add_argument('--num_classes', default=200, type=int, help='total number of classes')
-    #still required for save_features.py and test.py to find the model path correctly
+    parser.add_argument('--num_classes', default=100, type=int, help='total number of classes')
+    parser.add_argument('--save_freq', default=10, type=int, help='Save frequency')
+    parser.add_argument('--start_epoch', default=0, type=int, help ='Starting epoch')
+    parser.add_argument('--stop_epoch', default=400, type=int, help ='Stopping epoch')
+    parser.add_argument('--resume', action='store_true', help='continue from previous trained model with largest epoch')
+    parser.add_argument('--lr', default=0.001, type=int, help='learning rate')
 
     if script == 'train':
-        #make it larger than the maximum label value in base class
-        parser.add_argument('--save_freq', default=10, type=int, help='Save frequency')
-        parser.add_argument('--start_epoch', default=0, type=int, help ='Starting epoch')
-        parser.add_argument('--stop_epoch', default=400, type=int, help ='Stopping epoch')
-        #for meta-learning methods, each epoch contains 100 episodes. The default epoch number is dataset dependent.
-        parser.add_argument('--resume', action='store_true', help='continue from previous trained model with largest epoch')
-        parser.add_argument('--lr', default=0.001, type=int, help='learning rate') 
         parser.add_argument('--batch_size', default=16, type=int, help='batch size ')
-        parser.add_argument('--test_batch_size', default=2, type=int, help='batch size ')
+        parser.add_argument('--test_batch_size', default=32, type=int, help='batch size ')
         parser.add_argument('--alpha', default=2.0, type=int, help='for S2M2 training ')
-    elif script == 'test':
-        pass
+    if script == 'graph':
+        parser.add_argument('--n_way', default=3, type=int, help='ways')
+        parser.add_argument('--n_shot', default=1, type=int, help ='shots')
+        parser.add_argument('--n_val', default=1, type=int, help ='vals')
     return parser.parse_args()
 
 
