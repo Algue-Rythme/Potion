@@ -58,7 +58,7 @@ def split_train_test(data_file, split_ratio):
         classes[label].append(index)
     train_indexes, test_indexes = [], []
     for label in classes:
-        train_size = int(split_ratio * classes[label])
+        train_size = int(split_ratio * len(classes[label]))
         random.shuffle(classes[label])
         train_indexes += classes[label][:train_size]
         test_indexes += classes[label][train_size:]
@@ -77,8 +77,9 @@ class SimpleDataManager(DataManager):
     def get_data_loader(self, mode, batch_size, aug, num_workers=8, lazy_load=False):
         transform = self.trans_loader.get_composed_transform(aug)
         indexes = self.train_indexes if mode == 'train' else self.test_indexes
+        shuffle = mode == 'train'  # no shuffle at test time
         dataset = SimpleDataset(self.data_file, transform, indexes=indexes, lazy_load=lazy_load)
-        data_loader_params = dict(batch_size=batch_size, shuffle=True, num_workers=num_workers, pin_memory=True)       
+        data_loader_params = dict(batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, pin_memory=True)       
         data_loader = torch.utils.data.DataLoader(dataset, **data_loader_params)
         return data_loader
 

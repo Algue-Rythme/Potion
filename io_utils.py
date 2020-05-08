@@ -2,6 +2,7 @@ import os
 import glob
 import argparse
 import numpy as np
+import torch
 
 
 def parse_args(script):
@@ -48,3 +49,20 @@ def get_best_file(checkpoint_dir):
     if os.path.isfile(best_file):
         return best_file
     return get_resume_file(checkpoint_dir)
+
+def resume_training(checkpoint_dir, model):
+    resume_file = get_resume_file(checkpoint_dir)        
+    print("resume_file", resume_file)
+    tmp = torch.load(resume_file)
+    start_epoch = tmp['epoch']+1
+    print("restored epoch is" , tmp['epoch'])
+    state = tmp['state']
+    model.load_state_dict(state)
+    return start_epoch
+
+def enable_gpu_usage(model):
+    if torch.cuda.device_count() > 1:
+        model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
+    model.cuda()
+    return model
+    

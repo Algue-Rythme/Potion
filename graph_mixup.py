@@ -1,16 +1,13 @@
-import collections
-import itertools
 import os
 import random
 
-import numpy as np
 import torch
 import torch.nn as nn
 import tqdm
 
 from datamgr import SetDataManager
 from backbone import wrn28_10
-from io_utils import parse_args, get_resume_file
+from io_utils import parse_args, resume_training, enable_gpu_usage
 from top_losses import LossEngine, LossesBag
 
 use_gpu = torch.cuda.is_available()
@@ -55,9 +52,9 @@ def train_epoch(model, losses_bag, base_loader, optimizer):
         progress.update()
     progress.close()
 
-class TargetLoss(LossEngine):
+class DoubletLoss(LossEngine):
     def __init__(self, input_dim, intermediate_dim, n_way):
-        super(TargetLoss, self).__init__(name='Target', accuracy=True)
+        super(DoubletLoss, self).__init__(name='doublet', accuracy=True)
         self.n_way = n_way
         self.lin1 = nn.Linear(input_dim, intermediate_dim)
         self.act1 = nn.SELU()
@@ -89,10 +86,8 @@ class TargetLoss(LossEngine):
         self.update_acc(neg_scores, zeros)
         return loss
 
-
 def full_training(base_loader, base_loader_val, model, start_epoch, stop_epoch, params):
-
-    losses_bag = LossesBag([TargetLoss(640, 320, params.n_way)])
+    losses_bag = LossesBag([DoubletLoss(640, 320, params.n_way)])
     if use_gpu:
         losses_bag.use_gpu()
 
@@ -116,22 +111,6 @@ def full_training(base_loader, base_loader_val, model, start_epoch, stop_epoch, 
 
         evaluate(base_loader_val, model, losses_bag)
 
-    return model
-
-def resume_training(checkpoint_dir, model):
-    resume_file = get_resume_file(checkpoint_dir)
-    print("resume_file", resume_file)
-    tmp = torch.load(resume_file)
-    start_epoch = tmp['epoch']+1
-    print("restored epoch is" , tmp['epoch'])
-    state = tmp['state']
-    model.load_state_dict(state)
-    return start_epoch
-
-def enable_gpu_usage(model):
-    if torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
-    model.cuda()
     return model
 
 if __name__ == '__main__':
@@ -162,6 +141,7 @@ if __name__ == '__main__':
 
     if params.model == 'WideResNet28_10':
         model = wrn28_10(num_classes=params.num_classes)
+        torch.backends.cudnn.benchmark = True
     else:
         raise ValueError
 

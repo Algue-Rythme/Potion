@@ -8,8 +8,9 @@ import torch.nn as nn
 import tqdm
 
 from datamgr import SimpleDataManager
-from wrn import wrn28_10
-from io_utils import parse_args, get_resume_file
+from s2m2r_wrn import wrn28_10
+from io_utils import parse_args, resume_training, enable_gpu_usage
+from top_losses import metric_desc, update_acc
 
 
 use_gpu = torch.cuda.is_available()
@@ -86,22 +87,6 @@ def evaluate(base_loader_val, model, rotate_classifier=None):
             progress.update()
         progress.close()
     torch.cuda.empty_cache()  # ?
-
-def metric_desc(name, losses, correct_total=None):
-    avg_loss = np.mean(losses)
-    desc = ' '+name+('_loss=%.3f'%avg_loss)
-    if correct_total is not None:
-        correct, total = correct_total
-        acc = 100.*correct/total
-        desc += ' '+name+('_acc=%.2f%%'%acc)
-    return desc
-
-def update_acc(correct_total, outputs, targets):
-    _, predictions = torch.max(outputs, 1)
-    correct, total = correct_total
-    correct += predictions.eq(targets).cpu().sum().item()
-    total += targets.size(0)
-    return correct, total
 
 def train_epoch(model, rotate_classifier, base_loader, optimizer, fine_tuning):
     cross_entropy = nn.CrossEntropyLoss()
@@ -186,22 +171,6 @@ def train_s2m2(base_loader, base_loader_val, model, start_epoch, stop_epoch, par
         else:
             evaluate(base_loader_val, model, rotate_classifier=rotate_classifier)
 
-    return model
-
-def resume_training(checkpoint_dir, model):
-    resume_file = get_resume_file(checkpoint_dir)        
-    print("resume_file", resume_file)
-    tmp = torch.load(resume_file)
-    start_epoch = tmp['epoch']+1
-    print("restored epoch is" , tmp['epoch'])
-    state = tmp['state']
-    model.load_state_dict(state)
-    return start_epoch
-
-def enable_gpu_usage(model):
-    if torch.cuda.device_count() > 1:
-        model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))  
-    model.cuda()
     return model
 
 if __name__ == '__main__':

@@ -11,6 +11,16 @@ def metric_desc(name, losses, correct_total=None):
         desc += ' '+name+('_acc=%.2f%%'%acc)
     return desc
 
+def update_acc(correct_total, outputs, targets):
+    correct, total = correct_total
+    if len(targets.shape) == 1:
+        predictions = outputs > 0.
+    else:
+        _, predictions = torch.max(outputs, 1)
+    correct += int(predictions.eq(targets).cpu().sum().item())
+    total += int(targets.size(0))
+    return correct, total
+
 class LossEngine(torch.nn.Module):
     def __init__(self, name, accuracy):
         self.name = name
@@ -21,14 +31,7 @@ class LossEngine(torch.nn.Module):
             self.acc_meta = 0, 0
 
     def update_acc(self, outputs, targets):
-        correct, total = self.acc_meta
-        if len(targets.shape) == 1:
-            predictions = outputs > 0.
-        else:
-            _, predictions = torch.max(outputs, 1)
-        correct += int(predictions.eq(targets).cpu().sum().item())
-        total += int(targets.size(0))
-        self.acc_meta = correct, total
+        self.acc_meta = update_acc(self.acc_meta, outputs, targets)
 
     def get_desc(self):
         return metric_desc(self.name, self.losses_items, self.acc_meta)
@@ -37,6 +40,10 @@ class LossEngine(torch.nn.Module):
         self.losses_items = []
         if self.acc_meta is not None:
             self.acc_meta = 0, 0
+
+    @abstractmethod
+    def forward(self):
+        pass
 
 class LossesBag:
 
