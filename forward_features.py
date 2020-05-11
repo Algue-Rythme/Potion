@@ -42,7 +42,7 @@ if __name__ == '__main__':
     novel_file = data_dir[params.dataset] + 'novel.json'
     params.checkpoint_dir = '%s/checkpoints/%s/%s/%s' %(save_dir, params.dataset, params.model, params.run_name)
 
-    novel_datamgr = SimpleDataManager(novel_file, image_size, split_ratio=1., lazy_load=params.lazy_load)
+    novel_datamgr = SimpleDataManager(novel_file, image_size, split_ratio=0., lazy_load=params.lazy_load)
     novel_loader = novel_datamgr.get_data_loader(mode='test', batch_size=params.test_batch_size, aug=False, num_workers=12)
 
     if params.model == 'WideResNet28_10':
