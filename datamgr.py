@@ -71,7 +71,7 @@ class SimpleDataManager(DataManager):
         self.data_file = data_file
         self.lazy_load = lazy_load
         self.trans_loader = TransformLoader(image_size)
-        train_indexes, test_indexes = self.split_train_test(split_ratio)
+        train_indexes, test_indexes = split_train_test(split_ratio)
         self.train_indexes = train_indexes
         self.test_indexes = test_indexes
 
