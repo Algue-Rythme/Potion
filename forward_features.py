@@ -28,7 +28,7 @@ def save_features(model, data_loader, features_dir):
             output_dict[int(target.item())].append(sample)
         progress.update()
     progress.close()
-    save_pickle(os.path.join(features_dir, '/novel.plk'), output_dict)
+    save_pickle(os.path.join(features_dir, 'novel.plk'), output_dict)
 
 if __name__ == '__main__':
     params = parse_args('graph')
