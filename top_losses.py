@@ -18,7 +18,6 @@ def update_acc(correct_total, outputs, targets):
         predictions = outputs > 0.
     else:
         _, predictions = torch.max(outputs, 1)
-        print(predictions.shape)
     correct += int(predictions.eq(targets).cpu().sum().item())
     total += int(targets.size(0))
     return correct, total

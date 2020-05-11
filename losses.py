@@ -66,8 +66,7 @@ class TripletLoss(LossEngine):
     def score_against(self, a_b, c):
         a, b = a_b
         ab = self.act2(self.lin2(a * b))
-        # c = self.act3(self.lin3(c))
-        print(ab.shape, c.shape, self.bilinear.shape)
+        # c = self.act3(self.lin3(c))*
         abc = torch.einsum('bi,ij,bj->b', ab, self.bilinear, c)
         return abc  # shape B
 
@@ -84,5 +83,6 @@ class TripletLoss(LossEngine):
         if use_gpu:
             fake_target = fake_target.cuda()
         loss = self.ce_loss(logits, fake_target)
+        self.losses_items.append(float(loss.item()))
         self.update_acc(logits, fake_target)
         return loss, x_latent
