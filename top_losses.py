@@ -14,7 +14,7 @@ def metric_desc(name, losses, correct_total=None):
 
 def update_acc(correct_total, outputs, targets):
     correct, total = correct_total
-    if len(targets.shape) == 1:
+    if int(targets.shape[-1]) == 1:  # binary logit
         predictions = outputs > 0.
     else:
         _, predictions = torch.max(outputs, 1)
