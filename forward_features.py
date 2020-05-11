@@ -28,7 +28,7 @@ def save_features(model, data_loader, features_dir):
             output_dict[int(target.item())].append(sample)
         progress.update()
     progress.close()
-    save_pickle(features_dir + '/novel.plk', output_dict)
+    save_pickle(os.path.join(features_dir, '/novel.plk'), output_dict)
 
 if __name__ == '__main__':
     params = parse_args('graph')
@@ -55,9 +55,9 @@ if __name__ == '__main__':
         cudnn.benchmark = True
     start_epoch = resume_training(params.checkpoint_dir, model)
 
-    features_dir = 'images/%s/%s/%s/%s' %(params.dataset, params.model, params.run_name, str(start_epoch))
-    if not os.path.isdir(params.checkpoint_dir):
-        os.makedirs(params.checkpoint_dir)
+    features_dir = 'images/%s/%s/%s/%s/' %(params.dataset, params.model, params.run_name, str(start_epoch))
+    if not os.path.isdir(features_dir):
+        os.makedirs(features_dir)
 
     with torch.no_grad():
         save_features(model, novel_loader, features_dir)
