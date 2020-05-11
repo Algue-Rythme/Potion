@@ -53,9 +53,9 @@ class TripletLoss(LossEngine):
         self.n_way = n_way
         self.lin1 = nn.Linear(input_dim, intermediate_dim)
         self.act1 = nn.SELU()
-        self.lin2 = nn.Linear(input_dim, final_dim)
+        self.lin2 = nn.Linear(intermediate_dim, final_dim)
         self.act2 = nn.SELU()
-        # self.lin3 = nn.Linear(input_dim, final_dim)
+        # self.lin3 = nn.Linear(intermediate_dim, final_dim)
         # self.act3 = nn.SELU()
         self.bilinear = nn.Parameter(data=torch.FloatTensor((final_dim, intermediate_dim)),
                                      requires_grad=True)
