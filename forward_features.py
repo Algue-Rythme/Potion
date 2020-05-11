@@ -9,6 +9,7 @@ from datamgr import SimpleDataManager
 from io_utils import parse_args, resume_training, enable_gpu_usage
 from backbone import wrn28_10
 
+
 use_gpu = torch.cuda.is_available()
 
 def save_pickle(file, data):
