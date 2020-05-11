@@ -57,7 +57,7 @@ class TripletLoss(LossEngine):
         self.act2 = nn.SELU()
         # self.lin3 = nn.Linear(input_dim, final_dim)
         # self.act3 = nn.SELU()
-        self.bilinear = nn.Parameter(data=torch.FloatTensor(shape=(final_dim, intermediate_dim)),
+        self.bilinear = nn.Parameter(data=torch.FloatTensor((final_dim, intermediate_dim)),
                                      requires_grad=True)
         self.ce_loss = nn.CrossEntropyLoss()
 
