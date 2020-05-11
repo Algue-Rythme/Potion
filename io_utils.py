@@ -18,10 +18,10 @@ def parse_args(script):
     parser.add_argument('--stop_epoch', default=400, type=int, help ='Stopping epoch')
     parser.add_argument('--resume', action='store_true', help='continue from previous trained model with largest epoch')
     parser.add_argument('--lr', default=0.001, type=int, help='learning rate')
+    parser.add_argument('--test_batch_size', default=32, type=int, help='batch size ')
 
     if script == 'train':
         parser.add_argument('--batch_size', default=16, type=int, help='batch size ')
-        parser.add_argument('--test_batch_size', default=32, type=int, help='batch size ')
         parser.add_argument('--alpha', default=2.0, type=int, help='for S2M2 training ')
     if script == 'graph':
         parser.add_argument('--n_way', default=3, type=int, help='ways')
