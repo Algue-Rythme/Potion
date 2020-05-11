@@ -49,7 +49,7 @@ class DoubletLoss(LossEngine):
 
 class TripletLoss(LossEngine):
     def __init__(self, input_dim, intermediate_dim, final_dim, n_way):
-        super(TripletLoss, self).__init__(input_dim)
+        super(TripletLoss, self).__init__(name='triplet', accuracy=True)
         self.n_way = n_way
         self.lin1 = nn.Linear(input_dim, intermediate_dim)
         self.act1 = nn.SELU()
