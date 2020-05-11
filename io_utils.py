@@ -44,7 +44,7 @@ def get_resume_file(checkpoint_dir):
     resume_file = os.path.join(checkpoint_dir, '{:d}.tar'.format(max_epoch))
     return resume_file
 
-def get_best_file(checkpoint_dir):    
+def get_best_file(checkpoint_dir):
     best_file = os.path.join(checkpoint_dir, 'best.tar')
     if os.path.isfile(best_file):
         return best_file

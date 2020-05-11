@@ -8,7 +8,8 @@ import tqdm
 from datamgr import SetDataManager
 from backbone import wrn28_10
 from io_utils import parse_args, resume_training, enable_gpu_usage
-from top_losses import LossEngine, LossesBag
+from top_losses import LossesBag
+from losses import DoubletLoss, TripletLoss
 
 use_gpu = torch.cuda.is_available()
 
@@ -23,7 +24,7 @@ def evaluate(base_loader_val, model, losses_bag):
                 inputs, targets = inputs.cuda(), targets.cuda()
             inputs = torch.flatten(inputs, 0, 1)
             out_latent = model.forward(inputs)
-            progress_desc = ' '.join([desc for _, _, desc in losses_bag.get_losses(out_latent, targets)])
+            progress_desc = ' '.join([desc for _, _, _, desc in losses_bag.get_losses(out_latent, targets)])
             progress.set_description(desc=progress_desc)
             progress.update()
         progress.close()
@@ -44,7 +45,7 @@ def train_epoch(model, losses_bag, base_loader, optimizer):
             inputs, targets = inputs.cuda(), targets.cuda()
         inputs = torch.flatten(inputs, 0, 1)
         latent_space = model(inputs)
-        for _, loss, desc in losses_bag.get_losses(latent_space, targets):
+        for _, loss, _, desc in losses_bag.get_losses(latent_space, targets):
             progress_desc += desc
             loss.backward(retain_graph=True)
         optimizer.step()
@@ -52,45 +53,7 @@ def train_epoch(model, losses_bag, base_loader, optimizer):
         progress.update()
     progress.close()
 
-class DoubletLoss(LossEngine):
-    def __init__(self, input_dim, intermediate_dim, n_way, ):
-        super(DoubletLoss, self).__init__(name='doublet', accuracy=True)
-        self.n_way = n_way
-        self.lin1 = nn.Linear(input_dim, intermediate_dim)
-        self.act1 = nn.SELU()
-        self.lin2 = nn.Linear(intermediate_dim, 1)
-        self.bce_loss = nn.BCEWithLogitsLoss()
-
-    def forward(self, x_latent, _):
-        x_latent = self.lin1(x_latent)
-        x_latent = self.act1(x_latent)
-        batch_size = x_latent.shape[0]
-        per_class = int(batch_size / n_way)
-        indexes = list(range(batch_size))
-        positives = [random.sample(indexes[per_class*i:per_class*(i+1)], per_class) for i in range(n_way)]
-        positives = [p for pos in positives for p in pos]
-        negatives = [random.sample(indexes[:per_class*i]+indexes[per_class*(i+1):], per_class) for i in range(n_way)]
-        negatives = [n for neg in negatives for n in neg]
-        x_pos = x_latent[positives,:]
-        x_neg = x_latent[negatives,:]
-        pos_scores = torch.squeeze(self.lin2(x_latent * x_pos))
-        neg_scores = torch.squeeze(self.lin2(x_latent * x_neg))
-        ones, zeros = torch.ones([batch_size]), torch.zeros([batch_size])
-        if use_gpu:
-            ones, zeros = ones.cuda(), zeros.cuda()
-        pos_loss = self.bce_loss(pos_scores, ones)
-        neg_loss = self.bce_loss(neg_scores, zeros)
-        loss = pos_loss + neg_loss
-        self.losses_items.append(float(loss.item()))
-        self.update_acc(pos_scores, ones)
-        self.update_acc(neg_scores, zeros)
-        return loss
-
 def full_training(base_loader, base_loader_val, model, start_epoch, stop_epoch, params):
-    losses_bag = LossesBag([DoubletLoss(640, 320, params.n_way)])
-    if use_gpu:
-        losses_bag.use_gpu()
-
     optimizer = torch.optim.Adam([
                 {'params': model.parameters()},
                 ] + losses_bag.optimizer_dict())
@@ -107,7 +70,8 @@ def full_training(base_loader, base_loader_val, model, start_epoch, stop_epoch, 
 
         if (epoch % params.save_freq==0) or (epoch==stop_epoch-1):
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
-            torch.save({'epoch':epoch, 'state':model.state_dict() }, outfile)
+            model_dict = {'epoch':epoch, 'state':model.state_dict(), **losses_bag.states_dict()}
+            torch.save(model_dict, outfile)
 
         evaluate(base_loader_val, model, losses_bag)
 
@@ -145,10 +109,14 @@ if __name__ == '__main__':
     else:
         raise ValueError
 
+    losses_bag = LossesBag([TripletLoss(640, 160, 80, params.n_way)])
+
     if use_gpu:
         model = enable_gpu_usage(model)
+        losses_bag.use_gpu()
 
     if params.resume:
         start_epoch = resume_training(params.checkpoint_dir, model)
+        losses_bag.load_states(params.checkpoint_dir)
 
     model = full_training(base_loader, base_loader_val, model, start_epoch, start_epoch+stop_epoch, params)

@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from io_utils import get_resume_file
 import numpy as np
 import torch
 
@@ -79,6 +80,27 @@ class LossesBag:
 
     def get_losses(self, x_latent, target):
         for loss_engine in self.losses_engines.values():
-            loss = loss_engine(x_latent, target)
+            loss, x_latent = loss_engine(x_latent, target)
             desc = loss_engine.get_desc()
-            yield loss_engine.name, loss, desc
+            yield loss_engine.name, loss, x_latent, desc
+
+    def load_states(self, checkpoint_dir):
+        resume_file = get_resume_file(checkpoint_dir)
+        tmp = torch.load(resume_file)
+        for key in tmp:
+            if key in ['epoch', 'state']:
+                continue
+            state = tmp[key]
+            self.losses_engines[key].load_state_dict(state)
+
+    def states_dict(self):
+        return {loss.name:loss.state_dict() for loss in self.losses_engines.values()}
+
+    def agregate_features(self, latent, targets):
+        aggregated = []
+        full_desc = ''
+        for _, _, features, desc in self.get_losses(latent, targets):
+            aggregated.append(features.cpu().numpy())
+            full_desc.append(desc)
+        aggregated = np.concatenate(aggregated, axis=1)  # bigger features
+        return aggregated, ' '.join(full_desc)

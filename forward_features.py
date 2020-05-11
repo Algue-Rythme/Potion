@@ -8,6 +8,8 @@ import tqdm
 from datamgr import SimpleDataManager
 from io_utils import parse_args, resume_training, enable_gpu_usage
 from backbone import wrn28_10
+from top_losses import LossesBag
+from losses import DoubletLoss, TripletLoss
 
 
 use_gpu = torch.cuda.is_available()
@@ -16,19 +18,24 @@ def save_pickle(file, data):
     with open(file, 'wb') as f:
         pickle.dump(data, f)
 
-def save_features(model, data_loader, features_dir):
+def save_features(model, losses_bag, data_loader, features_dir):
     model.eval()
-    output_dict = collections.defaultdict(list)
+    penultimate_dict = collections.defaultdict(list)
+    features_dict = collections.defaultdict(list)
     progress = tqdm.tqdm(total=len(data_loader), leave=True, ascii=True)
     for inputs, targets in data_loader:
         if use_gpu:
             inputs = inputs.cuda()
-        out_latent = model(inputs).cpu().numpy()
-        for sample, target in zip(out_latent, targets):
-            output_dict[int(target.item())].append(sample)
+        penultimate_latent = model(inputs).cpu().numpy()
+        features_latent, desc = losses_bag.agregate_features(penultimate_latent, targets)
+        for penultimate, features, target in zip(penultimate_latent, features_latent, targets):
+            penultimate_dict[int(target.item())].append(penultimate)
+            features_dict[int(target.item())].append(features)
+        progress.set_description(desc=desc)
         progress.update()
     progress.close()
-    save_pickle(os.path.join(features_dir, 'novel.plk'), output_dict)
+    save_pickle(os.path.join(features_dir, 'novel_penultimate.plk'), penultimate_dict)
+    save_pickle(os.path.join(features_dir, 'novel_features.plk'), features_dict)
 
 if __name__ == '__main__':
     params = parse_args('graph')
@@ -49,15 +56,17 @@ if __name__ == '__main__':
         model = wrn28_10(num_classes=params.num_classes)
     else:
         raise ValueError
+    losses_bag = LossesBag([TripletLoss(640, 128, 64, params.n_way)])
 
     if use_gpu:
         model = enable_gpu_usage(model)
-        cudnn.benchmark = True
+        losses_bag.use_gpu()
     start_epoch = resume_training(params.checkpoint_dir, model)
+    losses_bag.load_states(params.checkpoint_dir)
 
     features_dir = 'images/%s/%s/%s/%s/' %(params.dataset, params.model, params.run_name, str(start_epoch))
     if not os.path.isdir(features_dir):
         os.makedirs(features_dir)
 
     with torch.no_grad():
-        save_features(model, novel_loader, features_dir)
+        save_features(model, losses_bag, novel_loader, features_dir)
