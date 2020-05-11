@@ -109,7 +109,7 @@ if __name__ == '__main__':
     else:
         raise ValueError
 
-    losses_bag = LossesBag([TripletLoss(640, 160, 80, params.n_way)])
+    losses_bag = LossesBag([TripletLoss(640, 128, 64, params.n_way)])
 
     if use_gpu:
         model = enable_gpu_usage(model)

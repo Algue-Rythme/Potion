@@ -65,7 +65,7 @@ class TripletLoss(LossEngine):
         a, b = a_b
         ab = self.act2(self.lin2(a * b))
         # c = self.act3(self.lin3(c))
-        print(ab.shape, c.shape)
+        print(ab.shape, c.shape, self.bilinear.shape)
         abc = torch.einsum('bi,ij,bj->b', ab, self.bilinear, c)
         return abc  # shape B
 
