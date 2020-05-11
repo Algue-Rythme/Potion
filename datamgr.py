@@ -39,7 +39,8 @@ class TransformLoader:
         if aug:
             transform_list = ['RandomSizedCrop', 'ImageJitter', 'RandomHorizontalFlip', 'ToTensor', 'Normalize']
         else:
-            transform_list = ['Resize', 'CenterCrop', 'ToTensor', 'Normalize']
+            transform_list = ['Resize', 'CenterCrop', 'ToTensor', 'Normalize']  WHY RESIZE ???
+            # transform_list = ['CenterCrop', 'ToTensor', 'Normalize']
 
         transform_funcs = [self.parse_transform(x) for x in transform_list]
         transform = transforms.Compose(transform_funcs)

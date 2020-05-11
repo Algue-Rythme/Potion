@@ -46,14 +46,14 @@ def train_epoch(model, losses_bag, base_loader, optimizer):
         latent_space = model(inputs)
         for _, loss, desc in losses_bag.get_losses(latent_space, targets):
             progress_desc += desc
-            loss.backward()
+            loss.backward(retain_graph=True)
         optimizer.step()
         progress.set_description(desc=progress_desc)
         progress.update()
     progress.close()
 
 class DoubletLoss(LossEngine):
-    def __init__(self, input_dim, intermediate_dim, n_way):
+    def __init__(self, input_dim, intermediate_dim, n_way, ):
         super(DoubletLoss, self).__init__(name='doublet', accuracy=True)
         self.n_way = n_way
         self.lin1 = nn.Linear(input_dim, intermediate_dim)

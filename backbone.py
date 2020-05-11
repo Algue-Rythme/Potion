@@ -108,7 +108,7 @@ class WideResNet(nn.Module):
             out = block(out)  # block of ResNet
         out = self.relu(self.bn1(out))
         out = F.avg_pool2d(out, out.size()[2:])
-        out_latent = out.view(out.size(0), -1)
+        out_latent = out.view(out.size(0), -1)  # flatten
         return out_latent
 
 
