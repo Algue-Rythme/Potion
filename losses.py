@@ -35,7 +35,8 @@ class DoubletLoss(LossEngine):
         x_pos, x_neg = get_pos_neg(x_latent, self.n_way)
         pos_scores = torch.squeeze(self.lin2(x_latent * x_pos))
         neg_scores = torch.squeeze(self.lin2(x_latent * x_neg))
-        ones, zeros = torch.ones([batch_size]), torch.zeros([batch_size])
+        ones = torch.ones([batch_size], dtype=torch.int64)
+        zeros = torch.zeros([batch_size], dtype=torch.int64)
         if use_gpu:
             ones, zeros = ones.cuda(), zeros.cuda()
         pos_loss = self.bce_loss(pos_scores, ones)
@@ -79,7 +80,7 @@ class TripletLoss(LossEngine):
         bca = self.score_against([x_pos, x_neg], x_latent)
         logits = torch.stack([abc, acb, bca], dim=1)
         batch_size = int(x_latent.shape[0])
-        fake_target = torch.zeros([batch_size])
+        fake_target = torch.zeros([batch_size], dtype=torch.int64)
         if use_gpu:
             fake_target = fake_target.cuda()
         loss = self.ce_loss(logits, fake_target)
