@@ -155,18 +155,17 @@ class MixupLoss(LossEngine):
     def forward(self, x_latent):
         batch_size, latent_size = int(x_latent.shape[0]), int(x_latent.shape[1])
         bernouilli_p = self.beta_distribution.sample([batch_size])
+        target = (bernouilli_p > 0.5).float()
         bernouilli_d = torch.distributions.Bernoulli(probs=bernouilli_p)
-        if use_gpu:
-            bernouilli_d.cuda()
         bernouilli = torch.transpose(bernouilli_d.sample([latent_size]), 0, 1)
+        if use_gpu:
+            target = target.cuda()
+            bernouilli = bernouilli.cuda()
         x_permuted = x_latent[torch.randperm(batch_size)]
         mixed = bernouilli * x_latent + (1. - bernouilli) * x_permuted  # hypercube interpolation
         mixed = self.get_features(mixed)
         x_latent = self.get_features(x_latent)
         x_permuted = self.get_features(x_permuted)
-        target = (bernouilli_p > 0.5).float()
-        if use_gpu:
-            target = target.cuda()
         against_latent = torch.einsum('bi,ij,bj->b', mixed, self.bilinear, x_latent)
         against_permuted = torch.einsum('bi,ij,bj->b', mixed, self.bilinear, x_permuted)
         logits = against_latent + against_permuted
