@@ -168,7 +168,7 @@ class MixupLoss(LossEngine):
         x_permuted = self.get_features(x_permuted)
         against_latent = torch.einsum('bi,ij,bj->b', mixed, self.bilinear, x_latent)
         against_permuted = torch.einsum('bi,ij,bj->b', mixed, self.bilinear, x_permuted)
-        logits = against_latent + against_permuted
+        logits = against_latent - against_permuted
         loss = self.ce_loss(logits, target)
         self.losses_items.append(float(loss.item()))
         self.update_acc(logits, target)
