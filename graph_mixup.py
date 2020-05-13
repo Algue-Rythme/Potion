@@ -29,7 +29,7 @@ def evaluate(base_loader_val, model, losses_bag):
             _ = losses_bag['triplet'](out_latent, targets)
             progress_desc = [losses_bag['triplet'].get_desc()]
 
-            angles = torch.zeros([int(inputs.shape[0])], dtype=torch.int64).gpu()
+            angles = torch.zeros([int(inputs.shape[0])], dtype=torch.int64).cuda()
             _ = losses_bag['rotations'](out_latent, angles)
             progress_desc.append(losses_bag['rotations'].get_desc())
 
