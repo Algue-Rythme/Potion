@@ -137,7 +137,7 @@ class RotationLoss(LossEngine):
 
 class MixupLoss(LossEngine):
     def __init__(self, input_dim, intermediate_dim, beta_param):
-        super(MixupLoss, self).__init__('mixup', accuracy=False)
+        super(MixupLoss, self).__init__('mixup', accuracy=True)
         self.lin1 = nn.Linear(input_dim, intermediate_dim)
         self.act1 = nn.SELU()
         alpha, beta = beta_param, beta_param
