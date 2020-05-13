@@ -19,6 +19,7 @@ def parse_args(script):
     parser.add_argument('--resume', action='store_true', help='continue from previous trained model with largest epoch')
     parser.add_argument('--lr', default=0.001, type=int, help='learning rate')
     parser.add_argument('--test_batch_size', default=32, type=int, help='batch size ')
+    parser.add_argument('--unit_sphere', action='store_true', help='project onto unit sphere')
 
     if script == 'train':
         parser.add_argument('--batch_size', default=16, type=int, help='batch size ')

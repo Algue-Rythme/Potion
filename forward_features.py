@@ -3,13 +3,12 @@ import os
 import random
 import pickle
 import torch
-import torch.backends.cudnn as cudnn
 import tqdm
 from datamgr import SimpleDataManager
 from io_utils import parse_args, resume_training, enable_gpu_usage
 from backbone import wrn28_10
 from top_losses import LossesBag
-from losses import DoubletLoss, TripletLoss
+from losses import TripletLoss
 
 
 use_gpu = torch.cuda.is_available()
@@ -27,7 +26,7 @@ def save_features(model, losses_bag, data_loader, features_dir):
         if use_gpu:
             inputs = inputs.cuda()
         penultimate_latent = model(inputs).cpu().numpy()
-        features_latent, desc = losses_bag.agregate_features(penultimate_latent, targets)
+        features_latent, desc = losses_bag.agregate_features(penultimate_latent)
         for penultimate, features, target in zip(penultimate_latent, features_latent, targets):
             penultimate_dict[int(target.item())].append(penultimate)
             features_dict[int(target.item())].append(features)

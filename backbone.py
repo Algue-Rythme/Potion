@@ -106,10 +106,10 @@ class WideResNet(nn.Module):
         out = self.conv1(out)
         for block in self.blocks:
             out = block(out)  # block of ResNet
-        out = self.relu(self.bn1(out))
-        out = F.avg_pool2d(out, out.size()[2:])
-        out_latent = out.view(out.size(0), -1)  # flatten
-        return out_latent
+        out = self.relu(self.bn1(out))  # positive
+        out = F.avg_pool2d(out, out.size()[2:])  # average of positive terms
+        out = out.view(out.size(0), -1)  # flatten
+        return out
 
 
 def wrn28_10(num_classes):

@@ -43,6 +43,10 @@ class LossEngine(torch.nn.Module):
             self.acc_meta = 0, 0
 
     @abstractmethod
+    def get_features(self):
+        pass
+
+    @abstractmethod
     def forward(self):
         pass
 
@@ -52,6 +56,9 @@ class LossesBag:
         self.losses_engines = dict()
         for arg in args:
             self.add_loss_engine(arg)
+
+    def __getitem__(self, name):
+        return self.losses_engines[name]
 
     def get_loss_engine(self, name):
         return self.losses_engines[name]
@@ -96,10 +103,15 @@ class LossesBag:
     def states_dict(self):
         return {loss.name:loss.state_dict() for loss in self.losses_engines.values()}
 
-    def agregate_features(self, latent, targets):
+    def get_features(self, x_latent):
+        for loss_engine in self.losses_engines.values():
+            features = loss_engine.get_latent(x_latent)
+            yield features
+
+    def agregate_features(self, x_latent):
         aggregated = []
         full_desc = ''
-        for _, _, features, desc in self.get_losses(latent, targets):
+        for _, _, features, desc in self.get_features(x_latent):
             aggregated.append(features.cpu().numpy())
             full_desc.append(desc)
         aggregated = np.concatenate(aggregated, axis=1)  # bigger features
