@@ -14,14 +14,14 @@ from losses import get_rotations, get_bag
 
 use_gpu = torch.cuda.is_available()
 
-def evaluate(base_loader_val, model, losses_bag, params):
+def evaluate(val_loader, model, losses_bag, params):
     if not params.local_batch:
         model.eval()
         losses_bag.eval()
     losses_bag.clear_epoch()
     with torch.no_grad():
-        progress = tqdm.tqdm(total=len(base_loader_val), leave=True, ascii=True)
-        for _, (inputs, targets) in enumerate(base_loader_val):
+        progress = tqdm.tqdm(total=len(val_loader), leave=True, ascii=True)
+        for _, (inputs, targets) in enumerate(val_loader):
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
             inputs = torch.flatten(inputs, 0, 1)
@@ -100,7 +100,7 @@ def train_epoch(model, losses_bag, base_loader, optimizer, params):
         progress.update()
     progress.close()
 
-def full_training(base_loader, base_loader_val, model, start_epoch, stop_epoch, params):
+def full_training(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     optimizer = torch.optim.Adam([
                 {'params': model.parameters()},
                 ] + losses_bag.optimizer_dict())
@@ -120,7 +120,7 @@ def full_training(base_loader, base_loader_val, model, start_epoch, stop_epoch, 
             model_dict = {'epoch':epoch, 'state':model.state_dict(), **losses_bag.states_dict()}
             torch.save(model_dict, outfile)
 
-        evaluate(base_loader_val, model, losses_bag, params)
+        evaluate(val_loader, model, losses_bag, params)
 
     return model
 
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     base_datamgr = SetDataManager(base_file, image_size, n_way, n_shot, n_val)
     val_datamgr = SetDataManager(val_file, image_size, n_way, n_shot, n_val)
     base_loader = base_datamgr.get_data_loader(aug=params.train_aug)
-    base_loader_val = val_datamgr.get_data_loader(aug=False)
+    val_loader = val_datamgr.get_data_loader(aug=False)
 
     if params.model == 'WideResNet28_10':
         model = wrn28_10(num_classes=params.num_classes)
@@ -166,4 +166,4 @@ if __name__ == '__main__':
         start_epoch = resume_training(params.checkpoint_dir, model)
         losses_bag.load_states(params.checkpoint_dir)
 
-    model = full_training(base_loader, base_loader_val, model, start_epoch, start_epoch+stop_epoch, params)
+    model = full_training(base_loader, val_loader, model, start_epoch, start_epoch+stop_epoch, params)
