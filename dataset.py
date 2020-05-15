@@ -2,6 +2,7 @@ import collections
 import os
 import functools
 import json
+import random
 import torch
 from PIL import Image
 import numpy as np
@@ -49,30 +50,43 @@ class SimpleDataset:
 
 
 class SetDataset:
-    def __init__(self, data_file, batch_size, transform, lazy_load=False):
+    def __init__(self, data_file, batch_size, transform, balanced=True, lazy_load=False):
         with open(data_file, 'r') as f:
             self.meta = json.load(f)
 
+        self.batch_size = batch_size
         self.cl_list = np.unique(self.meta['image_labels']).tolist()
-
         self.sub_meta = collections.defaultdict(list)
-        for cl in self.cl_list:
-            self.sub_meta[cl] = []
 
         for x,y in zip(self.meta['image_names'],self.meta['image_labels']):
             self.sub_meta[y].append(x)
 
+        if balanced:
+            for sub in self.sub_meta:
+                cropped = len(self.sub_meta[sub]) - (len(self.sub_meta[sub]) % batch_size)
+                self.sub_meta[sub] = self.sub_meta[sub][:cropped]
+
         self.sub_dataloader = []
+        self.iterators = []
         sub_data_loader_params = dict(batch_size=batch_size,
                                       shuffle=True,
                                       num_workers=0, #use main thread only or may receive multiple batches
                                       pin_memory=False)
         for cl in self.cl_list:
             sub_dataset = SubDataset(self.sub_meta[cl], cl, transform=transform, lazy_load=lazy_load)
-            self.sub_dataloader.append(torch.utils.data.DataLoader(sub_dataset, **sub_data_loader_params))
+            sub_dataloader = torch.utils.data.DataLoader(sub_dataset, **sub_data_loader_params)
+            self.sub_dataloader.append(sub_dataloader)
+            self.iterators.append(iter(sub_dataloader))
+
+    def get_classes_length(self):
+        return len(self.sub_dataloader[0])  # assume same size for each class
 
     def __getitem__(self,i):
-        return next(iter(self.sub_dataloader[i]))
+        try:
+            return next(self.iterators[i])
+        except StopIteration:
+            self.iterators[i] = iter(self.sub_dataloader[i])
+            return next(self.iterators[i])
 
     def __len__(self):
         return len(self.cl_list)
@@ -97,14 +111,22 @@ class SubDataset:
         return len(self.sub_meta)
 
 class EpisodicBatchSampler:
-    def __init__(self, n_classes, n_way, n_episodes):
+    def __init__(self, n_classes, n_way, n_subbatch):
         self.n_classes = n_classes
         self.n_way = n_way
-        self.n_episodes = n_episodes
+        self.n_subbatch = n_subbatch
+        self.total_batchs = self.n_classes * self.n_subbatch
 
     def __len__(self):
-        return self.n_episodes
+        return self.total_batchs // self.n_way
 
     def __iter__(self):
-        for _ in range(self.n_episodes):
-            yield torch.randperm(self.n_classes)[:self.n_way]
+        remaining_batches = {index:self.n_subbatch for index in range(self.n_classes)}
+        still_here = set(range(self.n_classes))
+        while still_here:
+            indexes = random.sample(still_here, self.n_way)
+            for index in indexes:  # clean classes
+                remaining_batches[index] -= 1
+                if remaining_batches[index] == 0:
+                    still_here.remove(index)
+            yield indexes

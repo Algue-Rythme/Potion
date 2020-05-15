@@ -173,3 +173,14 @@ class MixupLoss(LossEngine):
         self.losses_items.append(float(loss.item()))
         self.update_acc(logits, target)
         return loss, x_latent
+
+
+def get_bag(params):
+    bag = []
+    if params.triplet:
+        bag.append(TripletLoss(640, 128, 64, params.n_way))
+    if params.rotation:
+        bag.append(RotationLoss(640, 128))
+    if params.mixup:
+        bag.append(MixupLoss(640, 128, beta_param=0.4))
+    return bag

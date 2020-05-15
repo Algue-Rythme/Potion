@@ -9,14 +9,15 @@ from datamgr import SetDataManager
 from backbone import wrn28_10
 from io_utils import parse_args, resume_training, enable_gpu_usage
 from top_losses import LossesBag
-from losses import RotationLoss, TripletLoss, get_rotations, MixupLoss
+from losses import get_rotations, get_bag
 
 
 use_gpu = torch.cuda.is_available()
 
-def evaluate(base_loader_val, model, losses_bag):
-    model.eval()
-    losses_bag.eval()
+def evaluate(base_loader_val, model, losses_bag, params):
+    if not params.local_batch:
+        model.eval()
+        losses_bag.eval()
     losses_bag.clear_epoch()
     with torch.no_grad():
         progress = tqdm.tqdm(total=len(base_loader_val), leave=True, ascii=True)
@@ -24,17 +25,23 @@ def evaluate(base_loader_val, model, losses_bag):
             if use_gpu:
                 inputs, targets = inputs.cuda(), targets.cuda()
             inputs = torch.flatten(inputs, 0, 1)
+            targets = torch.flatten(targets, 0, 1)
+
+            progress_desc = []
             out_latent = model.forward(inputs)
 
-            _ = losses_bag['triplet'](out_latent, targets)
-            progress_desc = [losses_bag['triplet'].get_desc()]
+            if params.triplet:
+                _ = losses_bag['triplet'](out_latent, targets)
+                progress_desc.append(losses_bag['triplet'].get_desc())
 
-            angles = torch.zeros([int(inputs.shape[0])], dtype=torch.int64).cuda()
-            _ = losses_bag['rotation'](out_latent, angles)
-            progress_desc.append(losses_bag['rotation'].get_desc())
+            if params.rotation:
+                angles = torch.zeros([int(inputs.shape[0])], dtype=torch.int64).cuda()
+                _ = losses_bag['rotation'](out_latent, angles)
+                progress_desc.append(losses_bag['rotation'].get_desc())
 
-            _ = losses_bag['mixup'](out_latent)  # disentanglement
-            progress_desc.append(losses_bag['mixup'].get_desc())
+            if params.mixup:
+                _ = losses_bag['mixup'](out_latent)  # disentanglement
+                progress_desc.append(losses_bag['mixup'].get_desc())
 
             progress_desc = ' '.join(progress_desc)
             progress.set_description(desc=progress_desc)
@@ -62,23 +69,29 @@ def train_epoch(model, losses_bag, base_loader, optimizer, params):
         if use_gpu:
             inputs, targets = inputs.cuda(), targets.cuda()
         inputs = torch.flatten(inputs, 0, 1)
-        inputs, angles = get_rotations(inputs)
+        targets = torch.flatten(targets, 0, 1)
+
+        if params.rotation:
+            inputs, angles = get_rotations(inputs)
 
         latent_space = model(inputs)
         if params.unit_sphere:
             latent_space = normalize(latent_space)
 
-        loss, _ = losses_bag['triplet'](latent_space, targets)
-        loss.backward(retain_graph=True)
-        progress_desc.append(losses_bag['triplet'].get_desc())
+        if params.triplet:
+            loss, _ = losses_bag['triplet'](latent_space, targets)
+            loss.backward(retain_graph=True)
+            progress_desc.append(losses_bag['triplet'].get_desc())
 
-        loss, _ = losses_bag['rotation'](latent_space, angles)
-        loss.backward(retain_graph=True)
-        progress_desc.append(losses_bag['rotation'].get_desc())
+        if params.rotation:
+            loss, _ = losses_bag['rotation'](latent_space, angles)
+            loss.backward(retain_graph=True)
+            progress_desc.append(losses_bag['rotation'].get_desc())
 
-        loss, _ = losses_bag['mixup'](latent_space)
-        loss.backward(retain_graph=False)  # clear yo mama
-        progress_desc.append(losses_bag['mixup'].get_desc())
+        if params.mixup:
+            loss, _ = losses_bag['mixup'](latent_space)
+            loss.backward(retain_graph=False)  # clear yo mama
+            progress_desc.append(losses_bag['mixup'].get_desc())
 
         optimizer.step()
 
@@ -107,7 +120,7 @@ def full_training(base_loader, base_loader_val, model, start_epoch, stop_epoch, 
             model_dict = {'epoch':epoch, 'state':model.state_dict(), **losses_bag.states_dict()}
             torch.save(model_dict, outfile)
 
-        evaluate(base_loader_val, model, losses_bag)
+        evaluate(base_loader_val, model, losses_bag, params)
 
     return model
 
@@ -131,11 +144,10 @@ if __name__ == '__main__':
     stop_epoch = params.stop_epoch
 
     n_way, n_shot, n_val = params.n_way, params.n_shot, params.n_val
-    n_episode = int(600 / (n_way*(n_shot + n_val)))
-    base_datamgr = SetDataManager(base_file, image_size, n_way, n_shot, n_val, n_episode * 64)
-    val_datamgr = SetDataManager(base_file, image_size, n_way, n_shot, n_val, n_episode * 16)
-    base_loader = base_datamgr.get_data_loader(aug=params.train_aug, num_workers=12)
-    base_loader_val = val_datamgr.get_data_loader(aug=False, num_workers=12)
+    base_datamgr = SetDataManager(base_file, image_size, n_way, n_shot, n_val)
+    val_datamgr = SetDataManager(val_file, image_size, n_way, n_shot, n_val)
+    base_loader = base_datamgr.get_data_loader(aug=params.train_aug)
+    base_loader_val = val_datamgr.get_data_loader(aug=False)
 
     if params.model == 'WideResNet28_10':
         model = wrn28_10(num_classes=params.num_classes)
@@ -143,11 +155,8 @@ if __name__ == '__main__':
     else:
         raise ValueError
 
-    losses_bag = LossesBag([
-        TripletLoss(640, 128, 64, params.n_way),
-        RotationLoss(640, 128),
-        MixupLoss(640, 128, beta_param=0.4)
-        ])
+    bag = get_bag(params)
+    losses_bag = LossesBag(bag)
 
     if use_gpu:
         model = enable_gpu_usage(model)

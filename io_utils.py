@@ -20,14 +20,18 @@ def parse_args(script):
     parser.add_argument('--lr', default=0.001, type=int, help='learning rate')
     parser.add_argument('--test_batch_size', default=32, type=int, help='batch size ')
     parser.add_argument('--unit_sphere', action='store_true', help='project onto unit sphere')
+    parser.add_argument('--local_batch', action='store_true', help='statistics of current batch')
+    parser.add_argument('--triplet', action='store_true', help='triplet loss')
+    parser.add_argument('--rotation', action='store_true', help='rotation loss')
+    parser.add_argument('--mixup', action='store_true', help='mixup loss')
 
     if script == 'train':
         parser.add_argument('--batch_size', default=16, type=int, help='batch size ')
         parser.add_argument('--alpha', default=2.0, type=int, help='for S2M2 training ')
     if script == 'graph':
         parser.add_argument('--n_way', default=3, type=int, help='ways')
-        parser.add_argument('--n_shot', default=1, type=int, help ='shots')
-        parser.add_argument('--n_val', default=1, type=int, help ='vals')
+        parser.add_argument('--n_shot', default=2, type=int, help ='shots')
+        parser.add_argument('--n_val', default=0, type=int, help ='vals')
     return parser.parse_args()
 
 
@@ -66,4 +70,3 @@ def enable_gpu_usage(model):
         model = torch.nn.DataParallel(model, device_ids=range(torch.cuda.device_count()))
     model.cuda()
     return model
-    

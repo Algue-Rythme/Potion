@@ -110,7 +110,7 @@ class LossesBag:
 
     def agregate_features(self, x_latent):
         aggregated = []
-        full_desc = ''
+        full_desc = []
         for _, _, features, desc in self.get_features(x_latent):
             aggregated.append(features.cpu().numpy())
             full_desc.append(desc)

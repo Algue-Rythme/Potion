@@ -8,7 +8,7 @@ from datamgr import SimpleDataManager
 from io_utils import parse_args, resume_training, enable_gpu_usage
 from backbone import wrn28_10
 from top_losses import LossesBag
-from losses import TripletLoss
+from losses import get_bag
 
 
 use_gpu = torch.cuda.is_available()
@@ -18,15 +18,20 @@ def save_pickle(file, data):
         pickle.dump(data, f)
 
 def save_features(model, losses_bag, data_loader, features_dir):
-    model.eval()
+    if not params.local_batch:
+        model.eval()
+        losses_bag.eval()
     penultimate_dict = collections.defaultdict(list)
     features_dict = collections.defaultdict(list)
     progress = tqdm.tqdm(total=len(data_loader), leave=True, ascii=True)
     for inputs, targets in data_loader:
         if use_gpu:
             inputs = inputs.cuda()
-        penultimate_latent = model(inputs).cpu().numpy()
+        inputs = torch.flatten(inputs, 0, 1)
+        targets = torch.flatten(targets, 0, 1)
+        penultimate_latent = model(inputs)
         features_latent, desc = losses_bag.agregate_features(penultimate_latent)
+        penultimate_latent = penultimate_latent.cpu().numpy()
         for penultimate, features, target in zip(penultimate_latent, features_latent, targets):
             penultimate_dict[int(target.item())].append(penultimate)
             features_dict[int(target.item())].append(features)
@@ -55,7 +60,8 @@ if __name__ == '__main__':
         model = wrn28_10(num_classes=params.num_classes)
     else:
         raise ValueError
-    losses_bag = LossesBag([TripletLoss(640, 128, 64, params.n_way)])
+    bag = get_bag(params)
+    losses_bag = LossesBag(bag)
 
     if use_gpu:
         model = enable_gpu_usage(model)
