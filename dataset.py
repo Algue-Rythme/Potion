@@ -65,6 +65,9 @@ class SetDataset:
             for sub in self.sub_meta:
                 cropped = len(self.sub_meta[sub]) - (len(self.sub_meta[sub]) % batch_size)
                 self.sub_meta[sub] = self.sub_meta[sub][:cropped]
+        else:
+            for sub in self.sub_meta:
+                assert len(self.sub_meta[sub]) % batch_size == 0
 
         self.sub_dataloader = []
         self.iterators = []
@@ -112,6 +115,9 @@ class SubDataset:
 
 class EpisodicBatchSampler:
     def __init__(self, n_classes, n_way, n_subbatch):
+        if n_classes % n_way:
+            print('WARNING n_classes (%d) %% n_way (%d) != 0 (=%d)'%(n_classes, n_way, n_classes % n_way))
+            n_classes -= (n_classes%n_way)
         self.n_classes = n_classes
         self.n_way = n_way
         self.n_subbatch = n_subbatch
@@ -121,12 +127,10 @@ class EpisodicBatchSampler:
         return self.total_batchs // self.n_way
 
     def __iter__(self):
-        remaining_batches = {index:self.n_subbatch for index in range(self.n_classes)}
         still_here = set(range(self.n_classes))
-        while still_here:
+        for _ in range(len(self)):
             indexes = random.sample(still_here, self.n_way)
-            for index in indexes:  # clean classes
-                remaining_batches[index] -= 1
-                if remaining_batches[index] == 0:
-                    still_here.remove(index)
+            still_here = still_here - set(indexes)
+            if not still_here:
+                still_here = set(range(self.n_classes))  # reset classes
             yield indexes
