@@ -1,9 +1,7 @@
-import collections
 import os
 import random
 import pickle
 import torch
-import tqdm
 from datamgr import SimpleDataManager, SetDataManager
 from io_utils import parse_args, resume_training, enable_gpu_usage
 from backbone import wrn28_10
@@ -57,4 +55,4 @@ if __name__ == '__main__':
         os.makedirs(features_dir)
 
     with torch.no_grad():
-        save_features(model, losses_bag, novel_loader, features_dir)
+        save_features(model, losses_bag, novel_loader, features_dir, params)
