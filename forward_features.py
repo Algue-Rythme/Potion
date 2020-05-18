@@ -4,7 +4,7 @@ import random
 import pickle
 import torch
 import tqdm
-from datamgr import SimpleDataManager
+from datamgr import SimpleDataManager, SetDataManager
 from io_utils import parse_args, resume_training, enable_gpu_usage
 from backbone import wrn28_10
 from top_losses import LossesBag
@@ -21,6 +21,9 @@ def save_features(model, losses_bag, data_loader, features_dir):
     if not params.local_batch:
         model.eval()
         losses_bag.eval()
+    else:
+        model.train()
+        losses_bag.train()
     penultimate_dict = collections.defaultdict(list)
     features_dict = collections.defaultdict(list)
     progress = tqdm.tqdm(total=len(data_loader), leave=True, ascii=True)
@@ -53,8 +56,9 @@ if __name__ == '__main__':
     novel_file = data_dir[params.dataset] + 'novel.json'
     params.checkpoint_dir = '%s/checkpoints/%s/%s/%s' %(save_dir, params.dataset, params.model, params.run_name)
 
-    novel_datamgr = SimpleDataManager(novel_file, image_size, split_ratio=0., lazy_load=params.lazy_load)
-    novel_loader = novel_datamgr.get_data_loader(mode='test', batch_size=params.test_batch_size, aug=False, num_workers=12)
+    n_way, n_shot, n_val = params.n_way, params.n_shot, params.n_val
+    novel_datamgr = SetDataManager(novel_file, image_size, n_way, n_shot, n_val)
+    novel_loader = novel_datamgr.get_data_loader(aug=False)
 
     if params.model == 'WideResNet28_10':
         model = wrn28_10(num_classes=params.num_classes)
