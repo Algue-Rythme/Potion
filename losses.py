@@ -93,6 +93,7 @@ class TripletLoss(LossEngine):
         loss = self.ce_loss(logits, fake_target)
         self.losses_items.append(float(loss.item()))
         self.update_acc(logits, fake_target)
+        self.record_latent(x_latent)
         return loss, x_latent
 
 def get_rotations(inputs):
@@ -133,6 +134,7 @@ class RotationLoss(LossEngine):
         loss = self.ce_loss(logits, angles)
         self.losses_items.append(float(loss.item()))
         self.update_acc(logits, angles)
+        self.record_latent(x_latent)
         return loss, x_latent
 
 class MixupLoss(LossEngine):
@@ -172,6 +174,7 @@ class MixupLoss(LossEngine):
         loss = self.ce_loss(logits, target)
         self.losses_items.append(float(loss.item()))
         self.update_acc(logits, target)
+        self.record_latent(x_latent)
         return loss, x_latent
 
 

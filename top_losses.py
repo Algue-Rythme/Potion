@@ -28,6 +28,7 @@ class LossEngine(torch.nn.Module):
         super(LossEngine, self).__init__()
         self.losses_items = []
         self.acc_meta = None
+        self.last_latent = None
         if accuracy:
             self.acc_meta = 0, 0
 
@@ -41,6 +42,13 @@ class LossEngine(torch.nn.Module):
         self.losses_items = []
         if self.acc_meta is not None:
             self.acc_meta = 0, 0
+
+    @property
+    def latent(self):
+        return self.last_latent
+
+    def record_latent(self, x_latent):
+        self.last_latent = x_latent.detach().cpu().numpy()
 
     @abstractmethod
     def get_features(self):
@@ -103,16 +111,9 @@ class LossesBag:
     def states_dict(self):
         return {loss.name:loss.state_dict() for loss in self.losses_engines.values()}
 
-    def get_features(self, x_latent):
-        for loss_engine in self.losses_engines.values():
-            features = loss_engine.get_features(x_latent)
-            yield features
-
-    def agregate_features(self, x_latent):
+    def agregate_features(self):
         aggregated = []
-        full_desc = []
-        for _, _, features, desc in self.get_features(x_latent):
-            aggregated.append(features.cpu().numpy())
-            full_desc.append(desc)
+        for loss_engine in self.losses_engines.values():
+            aggregated.append(loss_engine.latent)
         aggregated = np.concatenate(aggregated, axis=1)  # bigger features
-        return aggregated, ' '.join(full_desc)
+        return aggregated

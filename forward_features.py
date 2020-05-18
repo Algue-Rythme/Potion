@@ -9,6 +9,7 @@ from io_utils import parse_args, resume_training, enable_gpu_usage
 from backbone import wrn28_10
 from top_losses import LossesBag
 from losses import get_bag
+from graph_mixup import evaluate
 
 
 use_gpu = torch.cuda.is_available()
@@ -17,30 +18,8 @@ def save_pickle(file, data):
     with open(file, 'wb') as f:
         pickle.dump(data, f)
 
-def save_features(model, losses_bag, data_loader, features_dir):
-    if not params.local_batch:
-        model.eval()
-        losses_bag.eval()
-    else:
-        model.train()
-        losses_bag.train()
-    penultimate_dict = collections.defaultdict(list)
-    features_dict = collections.defaultdict(list)
-    progress = tqdm.tqdm(total=len(data_loader), leave=True, ascii=True)
-    for inputs, targets in data_loader:
-        if use_gpu:
-            inputs = inputs.cuda()
-        inputs = torch.flatten(inputs, 0, 1)
-        targets = torch.flatten(targets, 0, 1)
-        penultimate_latent = model(inputs)
-        features_latent, desc = losses_bag.agregate_features(penultimate_latent)
-        penultimate_latent = penultimate_latent.cpu().numpy()
-        for penultimate, features, target in zip(penultimate_latent, features_latent, targets):
-            penultimate_dict[int(target.item())].append(penultimate)
-            features_dict[int(target.item())].append(features)
-        progress.set_description(desc=desc)
-        progress.update()
-    progress.close()
+def save_features(model, losses_bag, data_loader, features_dir, params):
+    penultimate_dict, features_dict = evaluate(data_loader, model, losses_bag, params, save_latent=True)
     save_pickle(os.path.join(features_dir, 'novel_penultimate.plk'), penultimate_dict)
     save_pickle(os.path.join(features_dir, 'novel_features.plk'), features_dict)
 

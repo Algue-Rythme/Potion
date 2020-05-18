@@ -1,3 +1,4 @@
+import collections
 import os
 import random
 
@@ -14,11 +15,17 @@ from losses import get_rotations, get_bag
 
 use_gpu = torch.cuda.is_available()
 
-def evaluate(val_loader, model, losses_bag, params):
+def evaluate(val_loader, model, losses_bag, params, save_latent=False):
+    losses_bag.clear_epoch()
     if not params.local_batch:
         model.eval()
         losses_bag.eval()
-    losses_bag.clear_epoch()
+    else:
+        model.train()
+        losses_bag.train()
+    if save_latent:
+        penultimate_dict = collections.defaultdict(list)
+        features_dict = collections.defaultdict(list)
     with torch.no_grad():
         progress = tqdm.tqdm(total=len(val_loader), leave=True, ascii=True)
         for _, (inputs, targets) in enumerate(val_loader):
@@ -29,6 +36,8 @@ def evaluate(val_loader, model, losses_bag, params):
 
             progress_desc = []
             out_latent = model.forward(inputs)
+            if params.unit_sphere:
+                out_latent = normalize(out_latent)
 
             if params.triplet:
                 _ = losses_bag['triplet'](out_latent, targets)
@@ -43,11 +52,21 @@ def evaluate(val_loader, model, losses_bag, params):
                 _ = losses_bag['mixup'](out_latent)  # disentanglement
                 progress_desc.append(losses_bag['mixup'].get_desc())
 
+            if save_latent:
+                features_latent = losses_bag.agregate_features()
+                penultimate_latent = out_latent.detach().cpu().numpy()
+                for penultimate, features, target in zip(penultimate_latent, features_latent, targets):
+                    penultimate_dict[int(target.item())].append(penultimate)
+                    features_dict[int(target.item())].append(features)
+
             progress_desc = ' '.join(progress_desc)
             progress.set_description(desc=progress_desc)
             progress.update()
         progress.close()
-    torch.cuda.empty_cache()  # ?
+    # torch.cuda.empty_cache()  # ?
+    if save_latent:
+        return penultimate_dict, features_dict
+    return None
 
 def normalize(out):
     norms = torch.clamp(torch.sum(out**2, dim=1), min=1e-5)  # positive sum
