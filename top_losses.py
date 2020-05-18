@@ -105,7 +105,7 @@ class LossesBag:
 
     def get_features(self, x_latent):
         for loss_engine in self.losses_engines.values():
-            features = loss_engine.get_latent(x_latent)
+            features = loss_engine.get_features(x_latent)
             yield features
 
     def agregate_features(self, x_latent):
